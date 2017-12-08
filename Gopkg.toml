@@ -1,0 +1,69 @@
+
+# Required by contrail-go-api/types
+required = ["github.com/golang/glog", "github.com/pborman/uuid"]
+
+# Ignore contrail-go-api/types since it is auto generated
+ignored = ["github.com/Juniper/contrail-go-api/types"]
+
+[[constraint]]
+  name = "github.com/Microsoft/go-winio"
+  revision = "78439966b38d69bf38227fbf57ac8a6fee70f69a"
+
+[[constraint]]
+  name = "github.com/Microsoft/hcsshim"
+  revision = "4486bc29c643509eac9de46f1d77ecb96b5b364f"
+
+[[constraint]]
+  name = "github.com/docker/docker"
+  revision = "0dbc182b6c4f6a72933680f98a6240a7681d94ee"
+
+[[constraint]]
+  name = "github.com/docker/go-connections"
+  revision = "3ede32e2033de7505e6500d6c868c2b9ed9f169d"
+
+# It is a transitive dependency but we would like to have this component in specific version
+[[override]]
+  name = "github.com/docker/distribution"
+  revision = "5db89f0ca68677abc5eefce8f2a0a772c98ba52d"
+
+# It is a transitive dependency but we would like to have this component in specific version
+[[override]]
+  name = "github.com/docker/go-units"
+  revision = "0dadbb0345b35ec7ef35e228dabb8de89a65bf52"
+
+[[constraint]]
+  name = "github.com/docker/go-plugins-helpers"
+  revision = "a9ef19c479cb60e751efa55f7f2b265776af1abf"
+
+[[constraint]]
+  name = "github.com/docker/libnetwork"
+  revision = "60e002dd61885e1cd909582f00f7eb4da634518a"
+
+[[constraint]]
+  name = "github.com/kardianos/osext"
+  revision = "ae77be60afb1dcacde03767a8c37337fad28ac14"
+
+[[constraint]]
+  name = "github.com/onsi/ginkgo"
+  revision = "11459a886d9cd66b319dac7ef1e917ee221372c9"
+
+[[constraint]]
+  name = "github.com/onsi/gomega"
+  revision = "dcabb60a477c2b6f456df65037cb6708210fbb02"
+
+[[constraint]]
+  name = "github.com/sirupsen/logrus"
+  revision = "89742aefa4b206dcf400792f3bd35b542998eb3b"
+
+[[constraint]]
+  name = "golang.org/x/sys"
+  revision = "062cd7e4e68206d8bab9b18396626e855c992658"
+
+[[constraint]]
+  name = "github.com/pborman/uuid"
+  revision = "e790cca94e6cc75c7064b1332e63811d4aae1a53"
+
+[[constraint]]
+  name = "github.com/Juniper/contrail-go-api"
+  source = "github.com/codilime/contrail-go-api"
+  branch = "windows"
