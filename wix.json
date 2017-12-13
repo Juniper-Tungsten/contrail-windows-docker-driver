@@ -1,7 +1,7 @@
 {
   "product": "Contrail docker driver",
   "company": "Juniper Networks",
-  "license": "LICENSE.rtf",
+  "license": "LICENSE_MSI.txt",
   "upgrade-code": "ca674931-876d-4dfb-bb67-136c585b6ffc",
   "files": {
     "guid": "ca8cbb44-2a0d-4f95-9375-dccabc92ffc1",
