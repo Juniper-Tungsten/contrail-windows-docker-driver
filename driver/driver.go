@@ -30,14 +30,13 @@ import (
 	"context"
 
 	"github.com/Juniper/contrail-go-api/types"
-	"github.com/Microsoft/go-winio"
-	"github.com/Microsoft/hcsshim"
-	"github.com/Juniper/contrail-windows-docker-driver/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/controller"
 	"github.com/Juniper/contrail-windows-docker-driver/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/hnsManager"
 	"github.com/Juniper/contrail-windows-docker-driver/hyperv"
+	"github.com/Microsoft/go-winio"
+	"github.com/Microsoft/hcsshim"
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerClient "github.com/docker/docker/client"
 	"github.com/docker/go-connections/sockets"
@@ -48,6 +47,7 @@ import (
 
 type ContrailDriver struct {
 	controller         *controller.Controller
+	agent              Agent
 	hnsMgr             *hnsManager.HNSManager
 	networkAdapter     common.AdapterName
 	vswitchName        common.VSwitchName
@@ -64,11 +64,13 @@ type NetworkMeta struct {
 	subnetCIDR string
 }
 
-func NewDriver(adapter, vswitchName string, c *controller.Controller) *ContrailDriver {
+func NewDriver(adapter, vswitchName string, c *controller.Controller, agent Agent,
+	hnsMgr *hnsManager.HNSManager) *ContrailDriver {
 
 	d := &ContrailDriver{
 		controller:         c,
-		hnsMgr:             &hnsManager.HNSManager{},
+		agent:              agent,
+		hnsMgr:             hnsMgr,
 		networkAdapter:     common.AdapterName(adapter),
 		vswitchName:        common.VSwitchName(vswitchName),
 		PipeAddr:           "//./pipe/" + common.DriverName,
@@ -429,8 +431,13 @@ func (d *ContrailDriver) CreateEndpoint(req *network.CreateEndpointRequest) (
 	// TODO: test this when Agent is ready
 	ifName := d.generateFriendlyName(hnsEndpointID)
 
-	go agent.AddPort(contrailVM.GetUuid(), contrailVif.GetUuid(), ifName, contrailMac, containerID,
-		contrailIP.GetInstanceIpAddress(), contrailNetwork.GetUuid())
+	go func() {
+		err := d.agent.AddPort(contrailVM.GetUuid(), contrailVif.GetUuid(), ifName, contrailMac, containerID,
+			contrailIP.GetInstanceIpAddress(), contrailNetwork.GetUuid())
+		if err != nil {
+			log.Error(err.Error())
+		}
+	}()
 
 	epAddressCIDR := fmt.Sprintf("%s/%v", instanceIP, contrailIpam.Subnet.IpPrefixLen)
 	r := &network.CreateEndpointResponse{
@@ -467,7 +474,12 @@ func (d *ContrailDriver) DeleteEndpoint(req *network.DeleteEndpointRequest) erro
 	if err != nil {
 		log.Warn("When handling DeleteEndpoint, interface wasn't found")
 	} else {
-		go agent.DeletePort(contrailVif.GetUuid())
+		go func() {
+			err := d.agent.DeletePort(contrailVif.GetUuid())
+			if err != nil {
+				log.Error(err.Error())
+			}
+		}()
 	}
 
 	contrailInstance, err := types.VirtualMachineByName(d.controller.ApiClient, containerID)

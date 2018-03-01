@@ -17,16 +17,20 @@ package main
 
 import (
 	"flag"
+	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/Juniper/contrail-windows-docker-driver/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/controller"
 	"github.com/Juniper/contrail-windows-docker-driver/driver"
+	"github.com/Juniper/contrail-windows-docker-driver/hnsManager"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
 )
@@ -35,6 +39,7 @@ type WinService struct {
 	adapter        string
 	controllerIP   string
 	controllerPort int
+	agentURL       string
 	vswitchName    string
 	logDir         string
 	logLevel       log.Level
@@ -54,6 +59,7 @@ func main() {
 		"IP address of Contrail Controller API")
 	var controllerPort = flag.Int("controllerPort", 8082,
 		"port of Contrail Controller API")
+	var agentURL = flag.String("agentURL", "http://127.0.0.1:9091", "URL of Agent API")
 	var logPath = flag.String("logPath", common.LogFilepath(), "log filepath")
 	var logLevelString = flag.String("logLevel", "Info",
 		"log verbosity (possible values: Debug|Info|Warn|Error|Fatal|Panic)")
@@ -119,6 +125,7 @@ func main() {
 		adapter:        *adapter,
 		controllerIP:   *controllerIP,
 		controllerPort: *controllerPort,
+		agentURL:       *agentURL,
 		vswitchName:    vswitchName,
 		logLevel:       logLevel,
 		keys:           *keys,
@@ -148,7 +155,14 @@ func (ws *WinService) Execute(args []string, winChangeReqChan <-chan svc.ChangeR
 		return
 	}
 
-	d := driver.NewDriver(ws.adapter, ws.vswitchName, c)
+	agentUrl, err := url.Parse(ws.agentURL)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	a := agent.NewAgentRestAPI(http.DefaultClient, agentUrl)
+	d := driver.NewDriver(ws.adapter, ws.vswitchName, c, a, &hnsManager.HNSManager{})
 	if err = d.StartServing(); err != nil {
 		log.Error(err)
 		return

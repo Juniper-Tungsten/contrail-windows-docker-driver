@@ -13,25 +13,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package driver
+package driver_test
 
 import (
 	"context"
 	"flag"
 	"fmt"
 	"net"
+	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/Juniper/contrail-go-api/types"
-	"github.com/Microsoft/hcsshim"
-	log "github.com/sirupsen/logrus"
+	"github.com/Juniper/contrail-windows-docker-driver/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/controller"
+	"github.com/Juniper/contrail-windows-docker-driver/driver"
 	"github.com/Juniper/contrail-windows-docker-driver/hns"
+	"github.com/Juniper/contrail-windows-docker-driver/hnsManager"
 	"github.com/Juniper/contrail-windows-docker-driver/hyperv"
+	"github.com/Microsoft/hcsshim"
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerTypesContainer "github.com/docker/docker/api/types/container"
 	dockerTypesNetwork "github.com/docker/docker/api/types/network"
@@ -42,6 +46,7 @@ import (
 	. "github.com/onsi/ginkgo/extensions/table"
 	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
+	log "github.com/sirupsen/logrus"
 )
 
 var netAdapter string
@@ -99,14 +104,15 @@ func cleanupAll() {
 
 func getDockerNetwork(docker *dockerClient.Client, dockerNetID string) (dockerTypes.NetworkResource, error) {
 	inspectOptions := dockerTypes.NetworkInspectOptions{
-		Scope:	 "",
+		Scope:   "",
 		Verbose: false,
 	}
 	return docker.NetworkInspect(context.Background(), dockerNetID, inspectOptions)
 }
 
 var contrailController *controller.Controller
-var contrailDriver *ContrailDriver
+var contrailDriver *driver.ContrailDriver
+var hnsMgr *hnsManager.HNSManager
 var project *types.Project
 
 const (
@@ -125,7 +131,7 @@ type OneTimeListener struct {
 var _ = Describe("Contrail Network Driver", func() {
 
 	BeforeEach(func() {
-		contrailDriver, contrailController, project = startDriver()
+		contrailDriver, contrailController, hnsMgr, project = startDriver()
 	})
 	AfterEach(func() {
 		if contrailDriver.IsServing {
@@ -312,7 +318,7 @@ var _ = Describe("On requests from docker daemon", func() {
 	var docker *dockerClient.Client
 
 	BeforeEach(func() {
-		contrailDriver, contrailController, project = startDriver()
+		contrailDriver, contrailController, hnsMgr, project = startDriver()
 
 		err := contrailDriver.StartServing()
 		Expect(err).ToNot(HaveOccurred())
@@ -432,7 +438,7 @@ var _ = Describe("On requests from docker daemon", func() {
 		var contrailNet *types.VirtualNetwork
 
 		assertRemovesHNSNet := func() {
-			resp, err := contrailDriver.hnsMgr.GetNetwork(tenantName, networkName,
+			resp, err := hnsMgr.GetNetwork(tenantName, networkName,
 				subnetCIDR)
 			Expect(err).To(HaveOccurred())
 			Expect(resp).To(BeNil())
@@ -467,7 +473,7 @@ var _ = Describe("On requests from docker daemon", func() {
 		Context("HNS network doesn't exist", func() {
 			// for example, HNS was hard-reset while docker wasn't.
 			BeforeEach(func() {
-				contrailDriver.hnsMgr.DeleteNetwork(tenantName, networkName, subnetCIDR)
+				hnsMgr.DeleteNetwork(tenantName, networkName, subnetCIDR)
 				err := removeDockerNetwork(docker, dockerNetID)
 				Expect(err).ToNot(HaveOccurred())
 			})
@@ -579,7 +585,7 @@ var _ = Describe("On requests from docker daemon", func() {
 				_ = createContrailNetwork(contrailController)
 				_ = createValidDockerNetwork(docker)
 
-				contrailDriver.hnsMgr.DeleteNetwork(tenantName, networkName, subnetCIDR)
+				hnsMgr.DeleteNetwork(tenantName, networkName, subnetCIDR)
 			})
 			It("responds with err", func() {
 				var err error
@@ -855,18 +861,18 @@ var _ = Describe("On requests from docker daemon", func() {
 	})
 })
 
-func startDriver() (*ContrailDriver, *controller.Controller, *types.Project) {
-	var c *controller.Controller
-	var p *types.Project
-
+func startDriver() (d *driver.ContrailDriver, c *controller.Controller, h *hnsManager.HNSManager, p *types.Project) {
 	if useActualController {
 		c, p = controller.NewClientAndProject(tenantName, controllerAddr, controllerPort)
 	} else {
 		c, p = controller.NewMockedClientAndProject(tenantName)
 	}
-	d := NewDriver(netAdapter, vswitchName, c)
+	h = &hnsManager.HNSManager{}
+	serverUrl, _ := url.Parse("http://127.0.0.1:9091")
+	a := agent.NewAgentRestAPI(http.DefaultClient, serverUrl)
+	d = driver.NewDriver(netAdapter, vswitchName, c, a, h)
 
-	return d, c, p
+	return
 }
 
 func getDockerClient() *dockerClient.Client {
@@ -966,14 +972,14 @@ func createContrailNetwork(c *controller.Controller) *types.VirtualNetwork {
 		c.ApiClient, networkName, subnetCIDR, project)
 }
 
-func deleteTheOnlyHNSEndpoint(d *ContrailDriver) {
+func deleteTheOnlyHNSEndpoint(d *driver.ContrailDriver) {
 	_, hnsEndpointID := getTheOnlyHNSEndpoint(d)
 	err := hns.DeleteHNSEndpoint(hnsEndpointID)
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func getTheOnlyHNSEndpoint(d *ContrailDriver) (*hcsshim.HNSEndpoint, string) {
-	hnsNets, err := contrailDriver.hnsMgr.ListNetworks()
+func getTheOnlyHNSEndpoint(d *driver.ContrailDriver) (*hcsshim.HNSEndpoint, string) {
+	hnsNets, err := hnsMgr.ListNetworks()
 	Expect(err).ToNot(HaveOccurred())
 	Expect(hnsNets).To(HaveLen(1))
 	eps, err := hns.ListHNSEndpointsOfNetwork(hnsNets[0].Id)
