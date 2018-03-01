@@ -23,10 +23,11 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/Juniper/contrail-windows-docker-driver/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/controller"
 	"github.com/Juniper/contrail-windows-docker-driver/driver"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
 )
@@ -148,7 +149,13 @@ func (ws *WinService) Execute(args []string, winChangeReqChan <-chan svc.ChangeR
 		return
 	}
 
-	d := driver.NewDriver(ws.adapter, ws.vswitchName, c)
+	a, err := agent.NewAgent(agent.PythonAPI)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	d := driver.NewDriver(ws.adapter, ws.vswitchName, c, a)
 	if err = d.StartServing(); err != nil {
 		log.Error(err)
 		return

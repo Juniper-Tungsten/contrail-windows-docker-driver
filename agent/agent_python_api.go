@@ -18,14 +18,17 @@ package agent
 import (
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
+	log "github.com/sirupsen/logrus"
 )
 
-func AddPort(vmUuid, vifUuid, ifName, mac, dockerID, ipAddress, vnUuid string) error {
+type agentPythonAPI struct{}
+
+// AddPort is using python API TODO
+func (agent *agentPythonAPI) AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAddress, vnUUID string) error {
 	stdout, stderr, err := common.Call("python", common.AgentAPIWrapperScriptPath(),
-		"add", vmUuid, vifUuid, fmt.Sprintf("\"%s\"", ifName), mac, dockerID,
-		ipAddress, vnUuid)
+		"add", vmUUID, vifUUID, fmt.Sprintf("\"%s\"", ifName), mac, dockerID,
+		ipAddress, vnUUID)
 	log.Debugf("Called Agent API wrapper: stdout: %s, stderr: %s", stdout, stderr)
 	if err != nil {
 		log.Errorf("When calling Agent API wrapper script: %s, %s", stdout, stderr)
@@ -34,9 +37,10 @@ func AddPort(vmUuid, vifUuid, ifName, mac, dockerID, ipAddress, vnUuid string) e
 	return nil
 }
 
-func DeletePort(vifUuid string) error {
+// DeletePort is unsing python API TODO
+func (agent *agentPythonAPI) DeletePort(vifUUID string) error {
 	stdout, stderr, err := common.Call("python", common.AgentAPIWrapperScriptPath(),
-		"delete", vifUuid)
+		"delete", vifUUID)
 	log.Debugln("Called Agent API wrapper: ", stdout)
 	if err != nil {
 		log.Errorf("When calling Agent API wrapper script: %s, %s", stdout, stderr)
