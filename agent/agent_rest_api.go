@@ -22,6 +22,10 @@ import (
 	"time"
 )
 
+const {
+	defaultAgentUrl = "127.0.0.1:1234"
+}
+
 type portRequestMsg struct {
 	Time        string `json:"time"`
 	VmUUID      string `json:"instance-id"`
@@ -40,18 +44,20 @@ type portRequestMsg struct {
 
 type agentRestAPI struct {
 	httpClient *http.Client
+	agentUrl string
 }
 
-func NewAgentRestAPI(httpClient *http.Client) Agent {
+func NewAgentRestAPI(httpClient *http.Client) *agentRestAPI {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
-	return &agentRestAPI{httpClient}
+	return &agentRestAPI{httpClient, defaultAgentUrl}
 }
 
 func (agent *agentRestAPI) AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAddress, vnUUID string) error {
 	t := time.Now()
-	msg := portRequestMsg{Time: t.String(),
+	msg := portRequestMsg {
+		Time:        t.String(),
 		VmUUID:      vmUUID,
 		VifUUID:     vifUUID,
 		IfName:      ifName,
@@ -63,15 +69,40 @@ func (agent *agentRestAPI) AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAdd
 		Type:        1,
 		RxVlanId:    -1,
 		TxVlanId:    -1,
-		VmProjectId: ""}
+		VmProjectId: ""
+	}
 
-	fmt.Println(json.MarshalIndent(msg, "", "\t"))
+	msgBody := json.MarshalIndent(msg, "", "\t")
+	fmt.Println(msgBody)
 
-	return nil
+	response, error := agent.httpClient.Post(agentUrl + "/port", msgBody, nil)
+	if error != nil {
+		return error
+	}
+
+	if response.StatusCode == StatusOK {
+		response.Body.Close()
+		return nil
+	} else {
+		return fmt.Errorf(
+			"Agent rest API: add port request failed (port = %s; status code = %d)",
+			vifUUID, response.StatusCode)
+	}
 }
 
-// DeletePort is unsing python API TODO
 func (agent *agentRestAPI) DeletePort(vifUUID string) error {
+	response, error := agent.httpClient.Do(http.NewRequest("DELETE",
+		agentUrl + "/port/" + vifUUID, nil))
+	if error != nil {
+		return error
+	}
 
-	return nil
+	if response.StatusCode == StatusOK {
+		response.Body.Close()
+		return nil
+	} else {
+		return fmt.Errorf(
+			"Agent rest API: delete port request failed (port = %s; status code = %d)",
+			vifUUID, response.StatusCode)
+	}
 }
