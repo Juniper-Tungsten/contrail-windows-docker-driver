@@ -35,7 +35,7 @@ func NewAgent(agentAPI AgentAPI) (Agent, error) {
 	case PythonAPI:
 		return &agentPythonAPI{}, nil
 	case RestAPI:
-		return NewAgentRestAPI(nil), nil
+		return NewAgentRestAPI(nil, nil), nil
 	default:
 		return nil, fmt.Errorf("Unknown agent API type %s", agentAPI)
 	}

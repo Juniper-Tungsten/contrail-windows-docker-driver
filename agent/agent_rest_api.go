@@ -49,11 +49,15 @@ type agentRestAPI struct {
 	agentUrl   string
 }
 
-func NewAgentRestAPI(httpClient *http.Client) *agentRestAPI {
+func NewAgentRestAPI(httpClient *http.Client, url *string) *agentRestAPI {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
-	return &agentRestAPI{httpClient, defaultAgentUrl}
+	agentUrl := defaultAgentUrl
+	if url != nil {
+		agentUrl = *url
+	}
+	return &agentRestAPI{httpClient, agentUrl}
 }
 
 func (agent *agentRestAPI) AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAddress, vnUUID string) error {
