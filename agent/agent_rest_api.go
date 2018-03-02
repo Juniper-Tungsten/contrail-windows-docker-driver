@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 )
 
 const (
@@ -28,7 +29,7 @@ const (
 )
 
 type portRequestMsg struct {
-	//Time        string `json:"time"`
+	Time        string `json:"time"`
 	VmUUID      string `json:"instance-id"`
 	VifUUID     string `json:"id"`
 	IfName      string `json:"system-name"`
@@ -56,9 +57,9 @@ func NewAgentRestAPI(httpClient *http.Client) *agentRestAPI {
 }
 
 func (agent *agentRestAPI) AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAddress, vnUUID string) error {
-	//t := time.Now()
+	t := time.Now()
 	msg := portRequestMsg{
-		//Time:        t.String(),
+		Time:        t.String(),
 		VmUUID:      vmUUID,
 		VifUUID:     vifUUID,
 		IfName:      ifName,
