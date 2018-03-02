@@ -149,7 +149,7 @@ func (ws *WinService) Execute(args []string, winChangeReqChan <-chan svc.ChangeR
 		return
 	}
 
-	a, err := agent.NewAgent(agent.PythonAPI)
+	a, err := agent.NewAgent(agent.RestAPI)
 	if err != nil {
 		log.Error(err)
 		return

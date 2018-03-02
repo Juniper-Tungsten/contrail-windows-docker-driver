@@ -18,13 +18,14 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"time"
 )
 
-const {
-	defaultAgentUrl = "127.0.0.1:1234"
-}
+const (
+	defaultAgentUrl = "127.0.0.1:9091"
+)
 
 type portRequestMsg struct {
 	Time        string `json:"time"`
@@ -44,7 +45,7 @@ type portRequestMsg struct {
 
 type agentRestAPI struct {
 	httpClient *http.Client
-	agentUrl string
+	agentUrl   string
 }
 
 func NewAgentRestAPI(httpClient *http.Client) *agentRestAPI {
@@ -56,7 +57,7 @@ func NewAgentRestAPI(httpClient *http.Client) *agentRestAPI {
 
 func (agent *agentRestAPI) AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAddress, vnUUID string) error {
 	t := time.Now()
-	msg := portRequestMsg {
+	msg := portRequestMsg{
 		Time:        t.String(),
 		VmUUID:      vmUUID,
 		VifUUID:     vifUUID,
@@ -69,40 +70,57 @@ func (agent *agentRestAPI) AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAdd
 		Type:        1,
 		RxVlanId:    -1,
 		TxVlanId:    -1,
-		VmProjectId: ""
+		VmProjectId: "",
 	}
 
-	msgBody := json.MarshalIndent(msg, "", "\t")
+	msgBody, _ := json.MarshalIndent(msg, "", "\t")
+	fmt.Println("========BodyRequest==========")
 	fmt.Println(msgBody)
+	fmt.Println("======End:BodyRequest========")
 
-	response, error := agent.httpClient.Post(agentUrl + "/port", msgBody, nil)
+	response, error := agent.httpClient.Post(agent.agentUrl+"/port", string(msgBody), nil)
 	if error != nil {
 		return error
 	}
+	defer response.Body.Close()
 
-	if response.StatusCode == StatusOK {
-		response.Body.Close()
-		return nil
-	} else {
+	if response.StatusCode != http.StatusOK {
 		return fmt.Errorf(
 			"Agent rest API: add port request failed (port = %s; status code = %d)",
 			vifUUID, response.StatusCode)
 	}
-}
 
-func (agent *agentRestAPI) DeletePort(vifUUID string) error {
-	response, error := agent.httpClient.Do(http.NewRequest("DELETE",
-		agentUrl + "/port/" + vifUUID, nil))
+	body, error := ioutil.ReadAll(response.Body)
 	if error != nil {
 		return error
 	}
+	fmt.Println("========BodyResponse==========")
+	fmt.Println(string(body))
+	fmt.Println("======End:BodyResponse========")
 
-	if response.StatusCode == StatusOK {
-		response.Body.Close()
-		return nil
-	} else {
+	return nil
+}
+
+func (agent *agentRestAPI) DeletePort(vifUUID string) error {
+	request, _ := http.NewRequest("DELETE", agent.agentUrl+"/port/"+vifUUID, nil)
+	response, error := agent.httpClient.Do(request)
+	if error != nil {
+		return error
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
 		return fmt.Errorf(
 			"Agent rest API: delete port request failed (port = %s; status code = %d)",
 			vifUUID, response.StatusCode)
 	}
+
+	body, error := ioutil.ReadAll(response.Body)
+	if error != nil {
+		return error
+	}
+
+	fmt.Println(string(body))
+
+	return nil
 }
