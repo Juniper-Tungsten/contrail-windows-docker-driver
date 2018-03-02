@@ -16,19 +16,19 @@
 package agent
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"time"
 )
 
 const (
-	defaultAgentUrl = "127.0.0.1:9091"
+	defaultAgentUrl = "http://127.0.0.1:9091"
 )
 
 type portRequestMsg struct {
-	Time        string `json:"time"`
+	//Time        string `json:"time"`
 	VmUUID      string `json:"instance-id"`
 	VifUUID     string `json:"id"`
 	IfName      string `json:"system-name"`
@@ -56,9 +56,9 @@ func NewAgentRestAPI(httpClient *http.Client) *agentRestAPI {
 }
 
 func (agent *agentRestAPI) AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAddress, vnUUID string) error {
-	t := time.Now()
+	//t := time.Now()
 	msg := portRequestMsg{
-		Time:        t.String(),
+		//Time:        t.String(),
 		VmUUID:      vmUUID,
 		VifUUID:     vifUUID,
 		IfName:      ifName,
@@ -73,12 +73,19 @@ func (agent *agentRestAPI) AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAdd
 		VmProjectId: "",
 	}
 
-	msgBody, _ := json.MarshalIndent(msg, "", "\t")
+	msgBody, _ := json.MarshalIndent(msg, "", "  ")
 	fmt.Println("========BodyRequest==========")
-	fmt.Println(msgBody)
+	fmt.Println(string(msgBody))
 	fmt.Println("======End:BodyRequest========")
 
-	response, error := agent.httpClient.Post(agent.agentUrl+"/port", string(msgBody), nil)
+	request, error := http.NewRequest("POST", agent.agentUrl+"/port", bytes.NewBuffer(msgBody))
+	if error != nil {
+		return error
+	}
+
+	request.Header.Set("Content-Type", "application/json")
+
+	response, error := agent.httpClient.Do(request)
 	if error != nil {
 		return error
 	}
@@ -102,7 +109,11 @@ func (agent *agentRestAPI) AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAdd
 }
 
 func (agent *agentRestAPI) DeletePort(vifUUID string) error {
-	request, _ := http.NewRequest("DELETE", agent.agentUrl+"/port/"+vifUUID, nil)
+	request, error := http.NewRequest("DELETE", agent.agentUrl+"/port/"+vifUUID, nil)
+	if error != nil {
+		return error
+	}
+
 	response, error := agent.httpClient.Do(request)
 	if error != nil {
 		return error
