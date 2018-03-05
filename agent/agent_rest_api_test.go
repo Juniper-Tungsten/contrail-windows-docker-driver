@@ -15,13 +15,13 @@ import (
 type httpHandler struct {
 	response struct {
 		status int
-		body string
+		body   string
 	}
 
 	request struct {
 		method string
-		path string
-		body []byte
+		path   string
+		body   []byte
 	}
 }
 
