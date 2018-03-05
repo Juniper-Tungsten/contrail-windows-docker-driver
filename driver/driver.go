@@ -432,10 +432,10 @@ func (d *ContrailDriver) CreateEndpoint(req *network.CreateEndpointRequest) (
 	ifName := d.generateFriendlyName(hnsEndpointID)
 
 	go func() {
-		error := d.agent.AddPort(contrailVM.GetUuid(), contrailVif.GetUuid(), ifName, contrailMac, containerID,
+		err := d.agent.AddPort(contrailVM.GetUuid(), contrailVif.GetUuid(), ifName, contrailMac, containerID,
 			contrailIP.GetInstanceIpAddress(), contrailNetwork.GetUuid())
-		if error != nil {
-			fmt.Println(error.Error())
+		if err != nil {
+			log.Error(err.Error())
 		}
 	}()
 
