@@ -13,28 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package agent
+package driver
 
-import (
-	"fmt"
-
-	"github.com/Juniper/contrail-windows-docker-driver/driver"
-)
-
-type AgentAPI string
-
-const (
-	PythonAPI = "PythonAPI"
-	RestAPI   = "RestAPI"
-)
-
-func NewAgent(agentAPI AgentAPI) (driver.Agent, error) {
-	switch agentAPI {
-	case PythonAPI:
-		return &agentPythonAPI{}, nil
-	case RestAPI:
-		return NewDefaultAgentRestAPI(), nil
-	default:
-		return nil, fmt.Errorf("Unknown agent API type %s", agentAPI)
-	}
+type Agent interface {
+	AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAddress, vnUUID string) error
+	DeletePort(vifUUID string) error
 }

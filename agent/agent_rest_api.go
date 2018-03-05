@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -45,18 +46,30 @@ type PortRequestMsg struct {
 
 type agentRestAPI struct {
 	httpClient *http.Client
-	agentUrl   string
+	agentUrl   *url.URL
 }
 
-func NewAgentRestAPI(httpClient *http.Client, url *string) *agentRestAPI {
-	if httpClient == nil {
-		httpClient = http.DefaultClient
+func NewDefaultAgentRestAPI() *agentRestAPI {
+	agentUrl, _ := url.Parse(defaultAgentUrl)
+	return NewAgentRestAPI(http.DefaultClient, agentUrl)
+}
+
+func NewAgentRestAPI(httpClient *http.Client, url *url.URL) *agentRestAPI {
+	return &agentRestAPI{httpClient, url}
+}
+
+func (agent *agentRestAPI) sendRequest(request *http.Request, errorMessage string) error {
+	response, err := agent.httpClient.Do(request)
+	if err != nil {
+		return err
 	}
-	agentUrl := defaultAgentUrl
-	if url != nil {
-		agentUrl = *url
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf(errorMessage, response.StatusCode)
 	}
-	return &agentRestAPI{httpClient, agentUrl}
+
+	return nil
 }
 
 func (agent *agentRestAPI) AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAddress, vnUUID string) error {
@@ -77,50 +90,31 @@ func (agent *agentRestAPI) AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAdd
 		VmProjectId: "",
 	}
 
-	msgBody, err := json.MarshalIndent(msg, "", "")
+	msgBody, err := json.Marshal(msg)
 	if err != nil {
 		return err
 	}
-
-	request, err := http.NewRequest("POST", agent.agentUrl+"/port", bytes.NewBuffer(msgBody))
+	requestUrl := agent.agentUrl
+	requestUrl.Path = "port"
+	request, err := http.NewRequest("POST", requestUrl.String(), bytes.NewBuffer(msgBody))
 	if err != nil {
 		return err
 	}
 
 	request.Header.Set("Content-Type", "application/json")
 
-	response, err := agent.httpClient.Do(request)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf(
-			"Agent rest API: add port request failed (port = %s; status code = %d)",
-			vifUUID, response.StatusCode)
-	}
-
-	return nil
+	return agent.sendRequest(request, fmt.Sprintf("Agent rest API: add port request failed "+
+		"(port = %s; status code = %d)", vifUUID))
 }
 
 func (agent *agentRestAPI) DeletePort(vifUUID string) error {
-	request, err := http.NewRequest("DELETE", agent.agentUrl+"/port/"+vifUUID, nil)
+	requestUrl := agent.agentUrl
+	requestUrl.Path = "port/" + vifUUID
+	request, err := http.NewRequest("DELETE", requestUrl.String(), nil)
 	if err != nil {
 		return err
 	}
 
-	response, err := agent.httpClient.Do(request)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf(
-			"Agent rest API: delete port request failed (port = %s; status code = %d)",
-			vifUUID, response.StatusCode)
-	}
-
-	return nil
+	return agent.sendRequest(request, fmt.Sprintf("Agent rest API: delete port request failed "+
+		"(port = %s; status code = %d)", vifUUID))
 }

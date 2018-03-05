@@ -1,7 +1,10 @@
 package agent_test
 
 import (
+	"net/url"
+
 	"github.com/Juniper/contrail-windows-docker-driver/agent"
+	"github.com/Juniper/contrail-windows-docker-driver/driver"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -36,9 +39,9 @@ func (h *httpHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 }
 
 var _ = Describe("AgentRestApi", func() {
-	handler := &httpHandler{}
+	mockHandler := &httpHandler{}
 	var testServer *httptest.Server
-	var agentInstance agent.Agent
+	var agentInstance driver.Agent
 
 	const (
 		vmUUID    = "vmUUID"
@@ -51,9 +54,10 @@ var _ = Describe("AgentRestApi", func() {
 	)
 
 	BeforeEach(func() {
-		testServer = httptest.NewServer(handler)
+		testServer = httptest.NewServer(mockHandler)
 		httpClient := &http.Client{Transport: &http.Transport{}}
-		agentInstance = agent.NewAgentRestAPI(httpClient, &testServer.URL)
+		serverUrl, _ := url.Parse(testServer.URL)
+		agentInstance = agent.NewAgentRestAPI(httpClient, serverUrl)
 	})
 
 	AfterEach(func() {
@@ -62,20 +66,29 @@ var _ = Describe("AgentRestApi", func() {
 
 	Describe("AddPort method", func() {
 		Context("When AddPort is correctly invoked", func() {
-			It("should send correct JSON request", func() {
-				handler.response.status = http.StatusOK
-				handler.response.body = "{}"
+			It("should send correct http request", func() {
+				mockHandler.response.status = http.StatusOK
+				mockHandler.response.body = "{}"
 
 				err := agentInstance.AddPort(
 					vmUUID, vifUUID, ifName, mac,
 					dockerID, ipAddress, vnUUID)
 
-				Expect(handler.request.method).To(Equal("POST"))
-				Expect(handler.request.path).To(Equal("/port"))
+				Expect(mockHandler.request.method).To(Equal("POST"))
+				Expect(mockHandler.request.path).To(Equal("/port"))
 				Expect(err).To(BeNil())
+			})
+
+			It("should send correct JSON request body", func() {
+				mockHandler.response.status = http.StatusOK
+				mockHandler.response.body = "{}"
+
+				agentInstance.AddPort(
+					vmUUID, vifUUID, ifName, mac,
+					dockerID, ipAddress, vnUUID)
 
 				var requestMessage agent.PortRequestMsg
-				err = json.Unmarshal(handler.request.body, &requestMessage)
+				err := json.Unmarshal(mockHandler.request.body, &requestMessage)
 				Expect(err).To(BeNil())
 
 				Expect(requestMessage.VmUUID).To(Equal(vmUUID))
@@ -95,8 +108,8 @@ var _ = Describe("AgentRestApi", func() {
 
 		Context("When AddPort is correctly invoked and server returns error", func() {
 			It("should return error", func() {
-				handler.response.status = http.StatusTeapot
-				handler.response.body = "{}"
+				mockHandler.response.status = http.StatusTeapot
+				mockHandler.response.body = "{}"
 
 				err := agentInstance.AddPort(
 					vmUUID, vifUUID, ifName, mac,
@@ -110,21 +123,21 @@ var _ = Describe("AgentRestApi", func() {
 	Describe("DeletePort method", func() {
 		Context("When DeletePort is correctly invoked", func() {
 			It("should send correct JSON request", func() {
-				handler.response.status = http.StatusOK
-				handler.response.body = "{}"
+				mockHandler.response.status = http.StatusOK
+				mockHandler.response.body = "{}"
 
 				err := agentInstance.DeletePort(vifUUID)
 
-				Expect(handler.request.method).To(Equal("DELETE"))
-				Expect(handler.request.path).To(Equal("/port/" + vifUUID))
+				Expect(mockHandler.request.method).To(Equal("DELETE"))
+				Expect(mockHandler.request.path).To(Equal("/port/" + vifUUID))
 				Expect(err).To(BeNil())
 			})
 		})
 
 		Context("When DeletePort is correctly invoked and server returns error", func() {
 			It("should return error", func() {
-				handler.response.status = http.StatusTeapot
-				handler.response.body = "{}"
+				mockHandler.response.status = http.StatusTeapot
+				mockHandler.response.body = "{}"
 
 				err := agentInstance.DeletePort(vifUUID)
 				Expect(err).NotTo(BeNil())

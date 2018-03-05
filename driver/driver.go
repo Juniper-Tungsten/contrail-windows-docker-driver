@@ -30,7 +30,6 @@ import (
 	"context"
 
 	"github.com/Juniper/contrail-go-api/types"
-	"github.com/Juniper/contrail-windows-docker-driver/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/controller"
 	"github.com/Juniper/contrail-windows-docker-driver/hns"
@@ -48,7 +47,7 @@ import (
 
 type ContrailDriver struct {
 	controller         *controller.Controller
-	agent              agent.Agent
+	agent              Agent
 	hnsMgr             *hnsManager.HNSManager
 	networkAdapter     common.AdapterName
 	vswitchName        common.VSwitchName
@@ -65,7 +64,7 @@ type NetworkMeta struct {
 	subnetCIDR string
 }
 
-func NewDriver(adapter, vswitchName string, c *controller.Controller, agent agent.Agent) *ContrailDriver {
+func NewDriver(adapter, vswitchName string, c *controller.Controller, agent Agent) *ContrailDriver {
 
 	d := &ContrailDriver{
 		controller:         c,
