@@ -19,7 +19,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"time"
 )
@@ -28,7 +27,7 @@ const (
 	defaultAgentUrl = "http://127.0.0.1:9091"
 )
 
-type portRequestMsg struct {
+type PortRequestMsg struct {
 	Time        string `json:"time"`
 	VmUUID      string `json:"instance-id"`
 	VifUUID     string `json:"id"`
@@ -62,7 +61,7 @@ func NewAgentRestAPI(httpClient *http.Client, url *string) *agentRestAPI {
 
 func (agent *agentRestAPI) AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAddress, vnUUID string) error {
 	t := time.Now()
-	msg := portRequestMsg{
+	msg := PortRequestMsg{
 		Time:        t.String(),
 		VmUUID:      vmUUID,
 		VifUUID:     vifUUID,
@@ -78,10 +77,10 @@ func (agent *agentRestAPI) AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAdd
 		VmProjectId: "",
 	}
 
-	msgBody, _ := json.MarshalIndent(msg, "", "  ")
-	fmt.Println("========BodyRequest==========")
-	fmt.Println(string(msgBody))
-	fmt.Println("======End:BodyRequest========")
+	msgBody, error := json.MarshalIndent(msg, "", "  ")
+	if error != nil {
+		return error
+	}
 
 	request, error := http.NewRequest("POST", agent.agentUrl+"/port", bytes.NewBuffer(msgBody))
 	if error != nil {
@@ -101,14 +100,6 @@ func (agent *agentRestAPI) AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAdd
 			"Agent rest API: add port request failed (port = %s; status code = %d)",
 			vifUUID, response.StatusCode)
 	}
-
-	body, error := ioutil.ReadAll(response.Body)
-	if error != nil {
-		return error
-	}
-	fmt.Println("========BodyResponse==========")
-	fmt.Println(string(body))
-	fmt.Println("======End:BodyResponse========")
 
 	return nil
 }
@@ -130,13 +121,6 @@ func (agent *agentRestAPI) DeletePort(vifUUID string) error {
 			"Agent rest API: delete port request failed (port = %s; status code = %d)",
 			vifUUID, response.StatusCode)
 	}
-
-	body, error := ioutil.ReadAll(response.Body)
-	if error != nil {
-		return error
-	}
-
-	fmt.Println(string(body))
 
 	return nil
 }
