@@ -28,6 +28,7 @@ import (
 	"github.com/Juniper/contrail-go-api/types"
 	"github.com/Microsoft/hcsshim"
 	log "github.com/sirupsen/logrus"
+	"github.com/Juniper/contrail-windows-docker-driver/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/controller"
 	"github.com/Juniper/contrail-windows-docker-driver/hns"
@@ -864,7 +865,8 @@ func startDriver() (*ContrailDriver, *controller.Controller, *types.Project) {
 	} else {
 		c, p = controller.NewMockedClientAndProject(tenantName)
 	}
-	d := NewDriver(netAdapter, vswitchName, c)
+	a, _ := agent.NewAgent(agent.RestAPI)
+	d := NewDriver(netAdapter, vswitchName, c, a)
 
 	return d, c, p
 }
