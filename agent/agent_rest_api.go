@@ -77,21 +77,21 @@ func (agent *agentRestAPI) AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAdd
 		VmProjectId: "",
 	}
 
-	msgBody, error := json.MarshalIndent(msg, "", "  ")
-	if error != nil {
-		return error
+	msgBody, err := json.MarshalIndent(msg, "", "")
+	if err != nil {
+		return err
 	}
 
-	request, error := http.NewRequest("POST", agent.agentUrl+"/port", bytes.NewBuffer(msgBody))
-	if error != nil {
-		return error
+	request, err := http.NewRequest("POST", agent.agentUrl+"/port", bytes.NewBuffer(msgBody))
+	if err != nil {
+		return err
 	}
 
 	request.Header.Set("Content-Type", "application/json")
 
-	response, error := agent.httpClient.Do(request)
-	if error != nil {
-		return error
+	response, err := agent.httpClient.Do(request)
+	if err != nil {
+		return err
 	}
 	defer response.Body.Close()
 
@@ -105,14 +105,14 @@ func (agent *agentRestAPI) AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAdd
 }
 
 func (agent *agentRestAPI) DeletePort(vifUUID string) error {
-	request, error := http.NewRequest("DELETE", agent.agentUrl+"/port/"+vifUUID, nil)
-	if error != nil {
-		return error
+	request, err := http.NewRequest("DELETE", agent.agentUrl+"/port/"+vifUUID, nil)
+	if err != nil {
+		return err
 	}
 
-	response, error := agent.httpClient.Do(request)
-	if error != nil {
-		return error
+	response, err := agent.httpClient.Do(request)
+	if err != nil {
+		return err
 	}
 	defer response.Body.Close()
 

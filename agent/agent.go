@@ -17,7 +17,6 @@ package agent
 
 import "fmt"
 
-// Agent interface TODO
 type Agent interface {
 	AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAddress, vnUUID string) error
 	DeletePort(vifUUID string) error

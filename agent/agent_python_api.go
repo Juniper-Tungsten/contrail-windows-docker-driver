@@ -24,7 +24,6 @@ import (
 
 type agentPythonAPI struct{}
 
-// AddPort is using python API TODO
 func (agent *agentPythonAPI) AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAddress, vnUUID string) error {
 	stdout, stderr, err := common.Call("python", common.AgentAPIWrapperScriptPath(),
 		"add", vmUUID, vifUUID, fmt.Sprintf("\"%s\"", ifName), mac, dockerID,
@@ -37,7 +36,6 @@ func (agent *agentPythonAPI) AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipA
 	return nil
 }
 
-// DeletePort is unsing python API TODO
 func (agent *agentPythonAPI) DeletePort(vifUUID string) error {
 	stdout, stderr, err := common.Call("python", common.AgentAPIWrapperScriptPath(),
 		"delete", vifUUID)

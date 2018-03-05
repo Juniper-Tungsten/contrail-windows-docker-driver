@@ -41,13 +41,13 @@ var _ = Describe("AgentRestApi", func() {
 	var agentInstance agent.Agent
 
 	const (
-		vmUUID = "vmUUID"
-		vifUUID = "vifUUID"
-		ifName = "ifName"
-		mac = "mac"
-		dockerID = "dockerID"
+		vmUUID    = "vmUUID"
+		vifUUID   = "vifUUID"
+		ifName    = "ifName"
+		mac       = "mac"
+		dockerID  = "dockerID"
 		ipAddress = "ipAddress"
-		vnUUID = "vnUUID"
+		vnUUID    = "vnUUID"
 	)
 
 	BeforeEach(func() {
