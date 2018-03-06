@@ -64,6 +64,16 @@ type NetworkMeta struct {
 	subnetCIDR string
 }
 
+type PortAttributes struct {
+	contrailVMUuid      string
+	contrailVifUuid     string
+	ifName              string
+	macAddress          string
+	containerID         string
+	ipAddress           string
+	contrailNetworkUuid string
+}
+
 func NewDriver(adapter, vswitchName string, c *controller.Controller, agent Agent,
 	hnsMgr *hnsManager.HNSManager) *ContrailDriver {
 
@@ -383,11 +393,6 @@ func (d *ContrailDriver) CreateEndpoint(req *network.CreateEndpointRequest) (
 		return nil, err
 	}
 
-	contrailVM, err := d.controller.GetOrCreateInstance(contrailVif, containerID)
-	if err != nil {
-		return nil, err
-	}
-
 	contrailIP, err := d.controller.GetOrCreateInstanceIp(contrailNetwork, contrailVif, contrailIpam.SubnetUuid)
 	if err != nil {
 		return nil, err
@@ -423,21 +428,12 @@ func (d *ContrailDriver) CreateEndpoint(req *network.CreateEndpointRequest) (
 		GatewayAddress:     contrailGateway,
 	}
 
-	hnsEndpointID, err := hns.CreateHNSEndpoint(hnsEndpointConfig)
+	_, err = hns.CreateHNSEndpoint(hnsEndpointConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: test this when Agent is ready
-	ifName := d.generateFriendlyName(hnsEndpointID)
-
-	go func() {
-		err := d.agent.AddPort(contrailVM.GetUuid(), contrailVif.GetUuid(), ifName, contrailMac, containerID,
-			contrailIP.GetInstanceIpAddress(), contrailNetwork.GetUuid())
-		if err != nil {
-			log.Error(err.Error())
-		}
-	}()
+	// AddPort - removed from this place
 
 	epAddressCIDR := fmt.Sprintf("%s/%v", instanceIP, contrailIpam.Subnet.IpPrefixLen)
 	r := &network.CreateEndpointResponse{
@@ -529,6 +525,54 @@ func (d *ContrailDriver) EndpointInfo(req *network.InfoRequest) (*network.InfoRe
 	return r, nil
 }
 
+func (d *ContrailDriver) GetPortAttributes(NetworkID, EndpointID string) (*PortAttributes, error) {
+	containerID := EndpointID
+	
+	hnsEp, err := hns.GetHNSEndpointByName(EndpointID)
+	if err != nil {
+		return nil, err
+	}
+	if hnsEp == nil {
+		return nil, errors.New("Such HNS endpoint doesn't exist")
+	}
+		
+	meta, err := d.networkMetaFromDockerNetwork(NetworkID)
+	if err != nil {
+		return nil, err
+	}
+	
+	contrailNetwork, err := d.controller.GetNetwork(meta.tenant, meta.network)
+	if err != nil {
+		return nil, err
+	}
+	
+	contrailVif, err := d.controller.GetOrCreateInterface(contrailNetwork, meta.tenant,
+		containerID)
+	if err != nil {
+		return nil, err
+	}
+	
+	contrailVM, err := d.controller.GetOrCreateInstance(contrailVif, containerID)
+	if err != nil {
+		return nil, err
+	}
+	
+	// TODO: test this when Agent is ready
+	ifName := d.generateFriendlyName(EndpointID)
+
+	port := &PortAttributes{
+	contrailVMUuid:      contrailVM.GetUuid(),
+	contrailVifUuid:     contrailVif.GetUuid(),
+	ifName:              ifName,
+	macAddress:          hnsEp.MacAddress,
+	containerID:         containerID,
+	ipAddress:           hnsEp.IPAddress.String(),
+	contrailNetworkUuid: contrailNetwork.GetUuid(),
+	}
+
+	return port, nil
+}
+
 func (d *ContrailDriver) Join(req *network.JoinRequest) (*network.JoinResponse, error) {
 	log.Debugln("=== Join")
 	log.Debugln(req)
@@ -543,6 +587,15 @@ func (d *ContrailDriver) Join(req *network.JoinRequest) (*network.JoinResponse, 
 	}
 	if hnsEp == nil {
 		return nil, errors.New("Such HNS endpoint doesn't exist")
+	}
+
+	port, err := d.GetPortAttributes(req.NetworkID, req.EndpointID)
+
+	err = d.agent.AddPort(port.contrailVMUuid, port.contrailVifUuid, port.ifName,
+		port.macAddress, port.containerID, port.ipAddress, port.contrailNetworkUuid)
+	if err != nil {
+		log.Error(err.Error())
+		return nil, err
 	}
 
 	r := &network.JoinResponse{
