@@ -64,12 +64,13 @@ type NetworkMeta struct {
 	subnetCIDR string
 }
 
-func NewDriver(adapter, vswitchName string, c *controller.Controller, agent Agent) *ContrailDriver {
+func NewDriver(adapter, vswitchName string, c *controller.Controller, agent Agent,
+	hnsMgr *hnsManager.HNSManager) *ContrailDriver {
 
 	d := &ContrailDriver{
 		controller:         c,
 		agent:              agent,
-		hnsMgr:             &hnsManager.HNSManager{},
+		hnsMgr:             hnsMgr,
 		networkAdapter:     common.AdapterName(adapter),
 		vswitchName:        common.VSwitchName(vswitchName),
 		PipeAddr:           "//./pipe/" + common.DriverName,

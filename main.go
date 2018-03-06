@@ -27,6 +27,7 @@ import (
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/controller"
 	"github.com/Juniper/contrail-windows-docker-driver/driver"
+	"github.com/Juniper/contrail-windows-docker-driver/hnsManager"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
@@ -155,7 +156,7 @@ func (ws *WinService) Execute(args []string, winChangeReqChan <-chan svc.ChangeR
 		return
 	}
 
-	d := driver.NewDriver(ws.adapter, ws.vswitchName, c, a)
+	d := driver.NewDriver(ws.adapter, ws.vswitchName, c, a, &hnsManager.HNSManager{})
 	if err = d.StartServing(); err != nil {
 		log.Error(err)
 		return
