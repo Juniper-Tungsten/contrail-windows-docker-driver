@@ -6,8 +6,7 @@
   "files": {
     "guid": "ca8cbb44-2a0d-4f95-9375-dccabc92ffc1",
     "items": [
-      "../../../../bin/contrail-windows-docker.exe",
-      "scripts/agent_api.py"
+      "../../../../bin/contrail-windows-docker.exe"
     ]
   },
   "env": {
