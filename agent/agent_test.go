@@ -99,7 +99,7 @@ var _ = Describe("AgentRestApi", func() {
 				Expect(requestMessage.IpAddress).To(Equal(ipAddress))
 				Expect(requestMessage.VnUUID).To(Equal(vnUUID))
 				Expect(requestMessage.Ipv6).To(Equal(""))
-				Expect(requestMessage.Type).To(Equal(1))
+				Expect(requestMessage.Type).To(Equal(0)) // 0 - vm port type
 				Expect(requestMessage.RxVlanId).To(Equal(-1))
 				Expect(requestMessage.TxVlanId).To(Equal(-1))
 				Expect(requestMessage.VmProjectId).To(Equal(""))

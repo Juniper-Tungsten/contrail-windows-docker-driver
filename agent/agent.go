@@ -24,6 +24,13 @@ import (
 	"time"
 )
 
+// It should be equal to PortSubscribeEntry::Type defined in Contrail Vrouter Agent
+const (
+	vmPortType     = 0
+	nameSpaceType  = 1
+	remotePortType = 2
+)
+
 type PortRequestMsg struct {
 	Time        string `json:"time"`
 	VmUUID      string `json:"instance-id"`
@@ -75,7 +82,7 @@ func (agent *agentRestAPI) constructAddPortRequest(vmUUID, vifUUID, ifName, mac,
 		IpAddress:   ipAddress,
 		VnUUID:      vnUUID,
 		Ipv6:        "",
-		Type:        1,
+		Type:        vmPortType,
 		RxVlanId:    -1,
 		TxVlanId:    -1,
 		VmProjectId: "",
