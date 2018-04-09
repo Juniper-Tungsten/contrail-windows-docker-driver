@@ -45,6 +45,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const hnsEndpointWaitingTime = 5
+
 type ContrailDriver struct {
 	controller         *controller.Controller
 	agent              Agent
@@ -432,6 +434,12 @@ func (d *ContrailDriver) CreateEndpoint(req *network.CreateEndpointRequest) (
 	ifName := d.generateFriendlyName(hnsEndpointID)
 
 	go func() {
+		// Temporary workaround for HNS issue.
+		// Due to the bug in Microsoft HNS, Docker Driver has to wait for some time until endpoint
+		// is ready to handle ARP requests. Unfortunately it seems that HNS doesn't have api
+		// to verify if endpoint setup is done.
+
+		time.Sleep(hnsEndpointWaitingTime * time.Second)
 		err := d.agent.AddPort(contrailVM.GetUuid(), contrailVif.GetUuid(), ifName, contrailMac, containerID,
 			contrailIP.GetInstanceIpAddress(), contrailNetwork.GetUuid())
 		if err != nil {
@@ -475,6 +483,10 @@ func (d *ContrailDriver) DeleteEndpoint(req *network.DeleteEndpointRequest) erro
 		log.Warn("When handling DeleteEndpoint, interface wasn't found")
 	} else {
 		go func() {
+			// Temporary workaround for HNS issue, see 'CreateEndpoint' method.
+			// This sleep is added to ensure that DeletePort request is called after AddPort.
+			// Value of waiting time has to be equal or greater than the one in 'CreateEndpoint'.
+			time.Sleep(hnsEndpointWaitingTime * time.Second)
 			err := d.agent.DeletePort(contrailVif.GetUuid())
 			if err != nil {
 				log.Error(err.Error())
