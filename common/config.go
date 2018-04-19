@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017 Juniper Networks, Inc. All Rights Reserved.
+// Copyright (c) 2018 Juniper Networks, Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,6 +36,16 @@ const (
 	// RootNetworkName is a name of root HNS network created solely for the purpose of
 	// having a virtual switch
 	RootNetworkName = "ContrailRootNetwork"
+
+	// CreateHNSNetworkInitialRetryDelay is a delay (in ms) between consecutive attemps
+	// to create HNSNetwork. After each retry, the delay is increased to
+	// give HNS more time to cool down.
+	CreateHNSNetworkInitialRetryDelay = 5 * 1000
+
+	// CreateHNSNetworkTimeout is maximum waiting time (in ms) for CreateHNSNetwork
+	// in case of retrying. This should be greater than CreateHNSNetworkInitialRetryDelay
+	// and AdapterReconnectTimeout combined for the retry to be attempted.
+	CreateHNSNetworkTimeout = 90 * 1000
 
 	// AdapterReconnectTimeout is a time (in ms) to wait for adapter to reacquire IP after a new
 	// HNS network is created. https://github.com/Microsoft/hcsshim/issues/108

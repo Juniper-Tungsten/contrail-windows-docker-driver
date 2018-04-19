@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017 Juniper Networks, Inc. All Rights Reserved.
+// Copyright (c) 2018 Juniper Networks, Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,11 +17,52 @@ package hns
 
 import (
 	"encoding/json"
+	"strings"
+	"time"
 
+	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Microsoft/hcsshim"
 	log "github.com/sirupsen/logrus"
-	"github.com/Juniper/contrail-windows-docker-driver/common"
 )
+
+type recoverableError struct {
+	inner error
+}
+
+func (e *recoverableError) Error() string {
+	return e.inner.Error()
+}
+
+func tryCreateHNSNetwork(config string) (string, error) {
+	response, err := hcsshim.HNSNetworkRequest("POST", "", config)
+	if err != nil {
+		log.Errorln(err)
+
+		errMsg := strings.ToLower(err.Error())
+		if strings.Contains(errMsg, "hns failed") && strings.Contains(errMsg, "unspecified error") {
+			return "", &recoverableError{inner: err}
+		} else {
+			return "", err
+		}
+	}
+
+	// When the first HNS network is created, a vswitch is also created and attached to
+	// specified network adapter. This adapter will temporarily lose network connectivity
+	// while it reacquires IPv4. We need to wait for it.
+	// https://github.com/Microsoft/hcsshim/issues/108
+	if err := common.WaitForInterface(common.HNSTransparentInterfaceName); err != nil {
+		log.Errorln(err)
+
+		deleteErr := DeleteHNSNetwork(response.Id)
+		if deleteErr != nil {
+			return "", deleteErr
+		}
+
+		return "", &recoverableError{inner: err}
+	}
+
+	return response.Id, nil
+}
 
 func CreateHNSNetwork(configuration *hcsshim.HNSNetwork) (string, error) {
 	log.Infoln("Creating HNS network")
@@ -32,24 +73,30 @@ func CreateHNSNetwork(configuration *hcsshim.HNSNetwork) (string, error) {
 	}
 	log.Debugln("Config:", string(configBytes))
 
-	response, err := hcsshim.HNSNetworkRequest("POST", "", string(configBytes))
-	if err != nil {
-		log.Errorln(err)
-		return "", err
+	var id = ""
+	delay := time.Millisecond * common.CreateHNSNetworkInitialRetryDelay
+	creatingStart := time.Now()
+	for {
+		id, err = tryCreateHNSNetwork(string(configBytes))
+		if err != nil {
+			if recoverableErr, ok := err.(*recoverableError); ok {
+				err = recoverableErr.inner
+				if time.Since(creatingStart) < time.Millisecond*common.CreateHNSNetworkTimeout {
+					log.Infoln("Creating HNS network failed, retrying.")
+					log.Infoln("Sleeping", delay, "ms")
+					time.Sleep(delay)
+					delay *= 2
+					continue
+				}
+			}
+			return "", err
+		}
+		break
 	}
 
-	// When the first HNS network is created, a vswitch is also created and attached to
-	// specified network adapter. This adapter will temporarily lose network connectivity
-	// while it reacquires IPv4. We need to wait for it.
-	// https://github.com/Microsoft/hcsshim/issues/108
-	if err := common.WaitForInterface(common.HNSTransparentInterfaceName); err != nil {
-		log.Errorln(err)
-		return "", err
-	}
+	log.Infoln("Created HNS network with ID:", id)
 
-	log.Infoln("Created HNS network with ID:", response.Id)
-
-	return response.Id, nil
+	return id, nil
 }
 
 func DeleteHNSNetwork(hnsID string) error {

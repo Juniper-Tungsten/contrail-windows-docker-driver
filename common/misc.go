@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017 Juniper Networks, Inc. All Rights Reserved.
+// Copyright (c) 2018 Juniper Networks, Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -69,6 +69,10 @@ func RestartDocker() error {
 	return nil
 }
 
+func isAutoconfigurationIP(ip net.IP) bool {
+	return ip[0] == 169 && ip[1] == 254
+}
+
 func WaitForInterface(ifname AdapterName) error {
 	pollingStart := time.Now()
 	for {
@@ -94,9 +98,10 @@ func WaitForInterface(ifname AdapterName) error {
 			// We're essentialy waiting for adapter to reacquire IPv4 (that's how they do it
 			// in Microsoft: https://github.com/Microsoft/hcsshim/issues/108)
 			for _, addr := range addrs {
-				ip, err, _ := net.ParseCIDR(addr.String())
-				if err != nil {
-					if ip.To4() != nil {
+				ip, _, err := net.ParseCIDR(addr.String())
+				if err == nil {
+					ip = ip.To4()
+					if ip != nil && !isAutoconfigurationIP(ip) {
 						log.Debugf("Waited %s for IP reacquisition", time.Since(pollingStart))
 						return nil
 					}
