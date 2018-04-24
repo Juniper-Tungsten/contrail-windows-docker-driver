@@ -19,9 +19,6 @@ import (
 	"flag"
 	"net/http"
 	"net/url"
-	"os"
-	"path"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -30,6 +27,7 @@ import (
 	"github.com/Juniper/contrail-windows-docker-driver/controller"
 	"github.com/Juniper/contrail-windows-docker-driver/driver"
 	"github.com/Juniper/contrail-windows-docker-driver/hnsManager"
+	"github.com/Juniper/contrail-windows-docker-driver/logging"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
@@ -42,7 +40,6 @@ type WinService struct {
 	agentURL       string
 	vswitchName    string
 	logDir         string
-	logLevel       log.Level
 	keys           controller.KeystoneEnvs
 }
 
@@ -60,7 +57,7 @@ func main() {
 	var controllerPort = flag.Int("controllerPort", 8082,
 		"port of Contrail Controller API")
 	var agentURL = flag.String("agentURL", "http://127.0.0.1:9091", "URL of Agent API")
-	var logPath = flag.String("logPath", common.LogFilepath(), "log filepath")
+	var logPath = flag.String("logPath", logging.DefaultLogFilepath(), "log filepath")
 	var logLevelString = flag.String("logLevel", "Info",
 		"log verbosity (possible values: Debug|Info|Warn|Error|Fatal|Panic)")
 	var vswitchNameWildcard = flag.String("vswitchName", "Layered <adapter>",
@@ -89,28 +86,12 @@ func main() {
 
 	vswitchName := strings.Replace(*vswitchNameWildcard, "<adapter>", *adapter, -1)
 
-	logLevel, err := log.ParseLevel(*logLevelString)
+	logHook, err := logging.SetupHook(*logPath, *logLevelString)
 	if err != nil {
-		log.Error(err)
+		log.Errorf("Setting up logging failed: %s", err)
 		return
 	}
-	log.SetLevel(logLevel)
-
-	log.Infoln("Logging to", path.Dir(*logPath))
-
-	err = os.MkdirAll(filepath.Dir(*logPath), 0755)
-	if err != nil {
-		log.Errorln("When trying to create log dir:", err)
-	}
-
-	logFile, err := os.OpenFile(*logPath, os.O_WRONLY|os.O_CREATE, 0755)
-	if err != nil {
-		log.Errorln("When trying to open log file:", err)
-	}
-	defer logFile.Close()
-
-	fileLoggerHook := common.NewLogToFileHook(logFile)
-	log.AddHook(fileLoggerHook)
+	defer logHook.Close()
 
 	keys := &controller.KeystoneEnvs{
 		Os_auth_url:    *os_auth_url,
@@ -127,7 +108,6 @@ func main() {
 		controllerPort: *controllerPort,
 		agentURL:       *agentURL,
 		vswitchName:    vswitchName,
-		logLevel:       logLevel,
 		keys:           *keys,
 	}
 

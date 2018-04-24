@@ -13,11 +13,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package common
+package logging
 
 import (
 	"os"
-	"path/filepath"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -30,8 +29,12 @@ type LogToFileHook struct {
 func NewLogToFileHook(file *os.File) *LogToFileHook {
 	return &LogToFileHook{
 		Logfile:   file,
-		formatter: new(log.TextFormatter),
+		formatter: &log.TextFormatter{FullTimestamp: true},
 	}
+}
+
+func (h *LogToFileHook) Close() {
+	h.Logfile.Close()
 }
 
 func (h *LogToFileHook) Levels() []log.Level {
@@ -45,8 +48,4 @@ func (h *LogToFileHook) Fire(entry *log.Entry) (err error) {
 		return err
 	}
 	return nil
-}
-
-func LogFilepath() string {
-	return string(filepath.Join(os.Getenv("ProgramData"), WinServiceName, "log.txt"))
 }
