@@ -49,10 +49,10 @@ const (
 // Timeout --------------------------------------------------------------
 
 type TimeoutPolicy struct {
-	timeout         time.Duration
-	delay           time.Duration
-	delayMultiplier int
-	clock           clock.Clock
+	Timeout         time.Duration
+	Delay           time.Duration
+	DelayMultiplier int
+	Clock           clock.Clock
 }
 
 func NewTimeoutPolicy(timeout, delay time.Duration) Policy {
@@ -61,17 +61,17 @@ func NewTimeoutPolicy(timeout, delay time.Duration) Policy {
 
 func NewExponentialBackoffPolicy(timeout, delay time.Duration, delayMultiplier int) Policy {
 	return &TimeoutPolicy{
-		timeout:         timeout,
-		delay:           delay,
-		delayMultiplier: delayMultiplier,
-		clock:           clock.NewRealClock(),
+		Timeout:         timeout,
+		Delay:           delay,
+		DelayMultiplier: delayMultiplier,
+		Clock:           clock.NewRealClock(),
 	}
 }
 
 func (policy *TimeoutPolicy) Start() Sleeper {
 	return &timeoutSleeper{
-		started: policy.clock.Now(),
-		delay:   policy.delay,
+		started: policy.Clock.Now(),
+		delay:   policy.Delay,
 		policy:  policy,
 	}
 }
@@ -83,17 +83,17 @@ type timeoutSleeper struct {
 }
 
 func (sleeper *timeoutSleeper) Sleep() Action {
-	if sleeper.policy.clock.Since(sleeper.started) > sleeper.policy.timeout {
+	if sleeper.policy.Clock.Since(sleeper.started) > sleeper.policy.Timeout {
 		return Stop
 	} else {
-		sleeper.policy.clock.Sleep(sleeper.delay)
-		sleeper.delay *= time.Duration(sleeper.policy.delayMultiplier)
+		sleeper.policy.Clock.Sleep(sleeper.delay)
+		sleeper.delay *= time.Duration(sleeper.policy.DelayMultiplier)
 		return Retry
 	}
 }
 
 func (sleeper *timeoutSleeper) Elapsed() time.Duration {
-	return sleeper.policy.clock.Since(sleeper.started)
+	return sleeper.policy.Clock.Since(sleeper.started)
 }
 
 // One shot --------------------------------------------------------------
