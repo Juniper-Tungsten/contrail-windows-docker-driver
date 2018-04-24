@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	"github.com/Juniper/contrail-windows-docker-driver/common/nal"
 	"github.com/Juniper/contrail-windows-docker-driver/hns"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
@@ -45,7 +44,7 @@ func TestHNSManager(t *testing.T) {
 var _ = BeforeSuite(func() {
 	err := common.HardResetHNS()
 	Expect(err).ToNot(HaveOccurred())
-	err = nal.RealNal().WaitForInterface(common.AdapterName(netAdapter))
+	err = common.WaitForRealInterface(common.AdapterName(netAdapter))
 	Expect(err).ToNot(HaveOccurred())
 })
 
@@ -67,7 +66,7 @@ var _ = Describe("HNS manager", func() {
 	AfterEach(func() {
 		err := common.HardResetHNS()
 		Expect(err).ToNot(HaveOccurred())
-		err = nal.RealNal().WaitForInterface(common.AdapterName(netAdapter))
+		err = common.WaitForRealInterface(common.AdapterName(netAdapter))
 		Expect(err).ToNot(HaveOccurred())
 	})
 

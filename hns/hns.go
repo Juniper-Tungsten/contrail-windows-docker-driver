@@ -18,22 +18,32 @@ package hns
 import (
 	"encoding/json"
 	"strings"
-	"time"
+
+	"github.com/Juniper/contrail-windows-docker-driver/common/networking"
+	"github.com/Juniper/contrail-windows-docker-driver/common/polling"
 
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	"github.com/Juniper/contrail-windows-docker-driver/common/nal"
 	log "github.com/sirupsen/logrus"
 )
 
 type Hns struct {
-	shim HcsShim
-	nal  nal.Nal
+	shim                     HcsShim
+	interfaceByName          func(string) (networking.Interface, error)
+	interfacePollingPolicy   polling.Policy
+	createNetworkRetryPolicy polling.Policy
 }
 
 func RealHns() Hns {
 	return Hns{
-		shim: &RealHcsShim{},
-		nal:  nal.RealNal(),
+		shim:            &RealHcsShim{},
+		interfaceByName: networking.InterfaceByName,
+		interfacePollingPolicy: polling.NewTimeoutPolicy(
+			common.AdapterReconnectTimeout,
+			common.AdapterPollingRate),
+		createNetworkRetryPolicy: polling.NewExponentialBackoffPolicy(
+			common.CreateHNSNetworkTimeout,
+			common.CreateHNSNetworkInitialRetryDelay,
+			2),
 	}
 }
 
@@ -43,6 +53,14 @@ type recoverableError struct {
 
 func (e *recoverableError) Error() string {
 	return e.inner.Error()
+}
+
+func (hns Hns) waitForInterface(ifname common.AdapterName) error {
+	return common.WaitForInterface(
+		hns.interfacePollingPolicy,
+		hns.interfaceByName,
+		ifname,
+	)
 }
 
 func (hns Hns) tryCreateHNSNetwork(config string) (string, error) {
@@ -61,7 +79,7 @@ func (hns Hns) tryCreateHNSNetwork(config string) (string, error) {
 	// specified network adapter. This adapter will temporarily lose network connectivity
 	// while it reacquires IPv4. We need to wait for it.
 	// https://github.com/Microsoft/hcsshim/issues/108
-	if err := hns.nal.WaitForInterface(common.HNSTransparentInterfaceName); err != nil {
+	if err := hns.waitForInterface(common.HNSTransparentInterfaceName); err != nil {
 		log.Errorln(err)
 
 		deleteErr := DeleteHNSNetwork(response.Id)
@@ -85,18 +103,14 @@ func (hns Hns) CreateHNSNetwork(configuration *Network) (string, error) {
 	log.Debugln("Config:", string(configBytes))
 
 	var id = ""
-	delay := time.Millisecond * common.CreateHNSNetworkInitialRetryDelay
-	creatingStart := time.Now()
+	sleeper := hns.createNetworkRetryPolicy.Start()
 	for {
 		id, err = hns.tryCreateHNSNetwork(string(configBytes))
 		if err != nil {
 			if recoverableErr, ok := err.(*recoverableError); ok {
 				err = recoverableErr.inner
-				if time.Since(creatingStart) < time.Millisecond*common.CreateHNSNetworkTimeout {
+				if sleeper.Sleep() == polling.Retry {
 					log.Infoln("Creating HNS network failed, retrying.")
-					log.Infoln("Sleeping", delay, "ms")
-					time.Sleep(delay)
-					delay *= 2
 					continue
 				}
 			}
@@ -145,7 +159,7 @@ func (hns Hns) DeleteHNSNetwork(hnsID string) error {
 		// also deleted. During this period, the adapter will temporarily lose network
 		// connectivity while it reacquires IPv4. We need to wait for it.
 		// https://github.com/Microsoft/hcsshim/issues/95
-		if err := hns.nal.WaitForInterface(
+		if err := hns.waitForInterface(
 			common.AdapterName(toDelete.NetworkAdapterName)); err != nil {
 			log.Errorln(err)
 			return err

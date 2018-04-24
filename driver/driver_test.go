@@ -30,7 +30,6 @@ import (
 	"github.com/Juniper/contrail-go-api/types"
 	"github.com/Juniper/contrail-windows-docker-driver/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	"github.com/Juniper/contrail-windows-docker-driver/common/nal"
 	"github.com/Juniper/contrail-windows-docker-driver/controller"
 	"github.com/Juniper/contrail-windows-docker-driver/driver"
 	"github.com/Juniper/contrail-windows-docker-driver/hns"
@@ -96,7 +95,7 @@ func cleanupAll() {
 	Expect(err).ToNot(HaveOccurred())
 	err = common.HardResetHNS()
 	Expect(err).ToNot(HaveOccurred())
-	err = nal.RealNal().WaitForInterface(common.AdapterName(netAdapter))
+	err = common.WaitForRealInterface(common.AdapterName(netAdapter))
 	Expect(err).ToNot(HaveOccurred())
 
 	docker := getDockerClient()
@@ -337,7 +336,7 @@ var _ = Describe("On requests from docker daemon", func() {
 		err = common.HardResetHNS()
 		Expect(err).ToNot(HaveOccurred())
 
-		err = nal.RealNal().WaitForInterface(common.AdapterName(netAdapter))
+		err = common.WaitForRealInterface(common.AdapterName(netAdapter))
 		Expect(err).ToNot(HaveOccurred())
 	})
 

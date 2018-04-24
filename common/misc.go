@@ -18,9 +18,13 @@ package common
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
+	"time"
 
+	"github.com/Juniper/contrail-windows-docker-driver/common/networking"
+	"github.com/Juniper/contrail-windows-docker-driver/common/polling"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -65,4 +69,58 @@ func RestartDocker() error {
 		return fmt.Errorf("When restarting docker: %s", err)
 	}
 	return nil
+}
+
+func isAutoconfigurationIP(ip net.IP) bool {
+	return ip[0] == 169 && ip[1] == 254
+}
+
+func WaitForInterface(policy polling.Policy, interfaceByName func(string) (networking.Interface, error), ifname AdapterName) error {
+	sleeper := policy.Start()
+	for {
+		queryStart := time.Now()
+		iface, err := interfaceByName(string(ifname))
+		if err != nil {
+			log.Warnf("Error when getting interface %s, but maybe it will appear soon: %s",
+				ifname, err)
+		} else {
+			addrs, err := iface.Addrs()
+			if err != nil {
+				return err
+			}
+
+			// We print query time because it turns out that above operations actually take quite a
+			// while (1-400ms), and the time depends (I think) on whether underlying interface
+			// configs are being changed. For example, query usually takes ~10ms, but if it's about
+			// to change, it can take up to 400ms. In other words, there must be some kind of mutex
+			// there. This information could be useful for debugging.
+			log.Debugf("Current %s addresses: %s. Query took %s", ifname,
+				addrs, time.Since(queryStart))
+
+			// We're essentialy waiting for adapter to reacquire IPv4 (that's how they do it
+			// in Microsoft: https://github.com/Microsoft/hcsshim/issues/108)
+			for _, addr := range addrs {
+				ip, _, err := net.ParseCIDR(addr.String())
+				if err == nil {
+					ip = ip.To4()
+					if ip != nil && !isAutoconfigurationIP(ip) {
+						log.Debugf("Waited %s for IP reacquisition", sleeper.Elapsed())
+						return nil
+					}
+				}
+			}
+		}
+
+		if sleeper.Sleep() == polling.Stop {
+			return errors.New("Waited for net adapter to reconnect for too long.")
+		}
+	}
+}
+
+func WaitForRealInterface(ifname AdapterName) error {
+	return WaitForInterface(
+		polling.NewTimeoutPolicy(AdapterReconnectTimeout, AdapterPollingRate),
+		networking.InterfaceByName,
+		ifname,
+	)
 }

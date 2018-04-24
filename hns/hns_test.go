@@ -25,7 +25,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	"github.com/Juniper/contrail-windows-docker-driver/common/nal"
 	"github.com/Microsoft/hcsshim"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
@@ -59,14 +58,14 @@ func TestHNS(t *testing.T) {
 var _ = BeforeSuite(func() {
 	err := common.HardResetHNS()
 	Expect(err).ToNot(HaveOccurred())
-	err = nal.RealNal().WaitForInterface(common.AdapterName(netAdapter))
+	err = common.WaitForRealInterface(common.AdapterName(netAdapter))
 	Expect(err).ToNot(HaveOccurred())
 })
 
 var _ = AfterSuite(func() {
 	err := common.HardResetHNS()
 	Expect(err).ToNot(HaveOccurred())
-	err = nal.RealNal().WaitForInterface(common.AdapterName(netAdapter))
+	err = common.WaitForRealInterface(common.AdapterName(netAdapter))
 	Expect(err).ToNot(HaveOccurred())
 })
 
@@ -419,7 +418,7 @@ var _ = Describe("HNS race conditions workarounds", func() {
 		targetAddr = fmt.Sprintf("%s:%v", controllerAddr, controllerPort)
 		err := common.HardResetHNS()
 		Expect(err).ToNot(HaveOccurred())
-		err = nal.RealNal().WaitForInterface(common.AdapterName(netAdapter))
+		err = common.WaitForRealInterface(common.AdapterName(netAdapter))
 		Expect(err).ToNot(HaveOccurred())
 	})
 
