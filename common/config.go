@@ -47,9 +47,9 @@ const (
 	// and AdapterReconnectTimeout combined for the retry to be attempted.
 	CreateHNSNetworkTimeout = 90 * 1000
 
-	// AdapterReconnectTimeout is a time (in ms) to wait for adapter to reacquire IP after a new
-	// HNS network is created. https://github.com/Microsoft/hcsshim/issues/108
-	AdapterReconnectTimeout = 15000
+	// AdapterReconnectMaxRetries is number of polling retries to wait for adapter
+	// to reacquire IP after a new HNS network is created. https://github.com/Microsoft/hcsshim/issues/108
+	AdapterReconnectMaxRetries = 30
 
 	// AdapterPollingRate is rate (in ms) of polling of network adapter while waiting for it to
 	// reacquire IP.
