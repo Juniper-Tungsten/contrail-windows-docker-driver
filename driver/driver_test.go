@@ -35,7 +35,6 @@ import (
 	"github.com/Juniper/contrail-windows-docker-driver/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/hnsManager"
 	"github.com/Juniper/contrail-windows-docker-driver/hyperv"
-	"github.com/Juniper/contrail-windows-docker-driver/networking_acl"
 	"github.com/Microsoft/hcsshim"
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerTypesContainer "github.com/docker/docker/api/types/container"
@@ -96,7 +95,7 @@ func cleanupAll() {
 	Expect(err).ToNot(HaveOccurred())
 	err = common.HardResetHNS()
 	Expect(err).ToNot(HaveOccurred())
-	err = networking_acl.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
+	err = common.WaitForInterface(common.AdapterName(netAdapter))
 	Expect(err).ToNot(HaveOccurred())
 
 	docker := getDockerClient()
@@ -337,7 +336,7 @@ var _ = Describe("On requests from docker daemon", func() {
 		err = common.HardResetHNS()
 		Expect(err).ToNot(HaveOccurred())
 
-		err = networking_acl.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
+		err = common.WaitForInterface(common.AdapterName(netAdapter))
 		Expect(err).ToNot(HaveOccurred())
 	})
 

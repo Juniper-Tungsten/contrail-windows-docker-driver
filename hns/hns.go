@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	"github.com/Juniper/contrail-windows-docker-driver/networking_acl"
 	"github.com/Microsoft/hcsshim"
 	log "github.com/sirupsen/logrus"
 )
@@ -51,7 +50,7 @@ func tryCreateHNSNetwork(config string) (string, error) {
 	// specified network adapter. This adapter will temporarily lose network connectivity
 	// while it reacquires IPv4. We need to wait for it.
 	// https://github.com/Microsoft/hcsshim/issues/108
-	if err := networking_acl.WaitForValidIPReacquisition(common.HNSTransparentInterfaceName); err != nil {
+	if err := common.WaitForInterface(common.HNSTransparentInterfaceName); err != nil {
 		log.Errorln(err)
 
 		deleteErr := DeleteHNSNetwork(response.Id)
@@ -135,7 +134,7 @@ func DeleteHNSNetwork(hnsID string) error {
 		// also deleted. During this period, the adapter will temporarily lose network
 		// connectivity while it reacquires IPv4. We need to wait for it.
 		// https://github.com/Microsoft/hcsshim/issues/95
-		if err := networking_acl.WaitForValidIPReacquisition(
+		if err := common.WaitForInterface(
 			common.AdapterName(toDelete.NetworkAdapterName)); err != nil {
 			log.Errorln(err)
 			return err
