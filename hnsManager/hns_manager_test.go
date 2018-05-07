@@ -22,6 +22,7 @@ import (
 
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/hns"
+	"github.com/Juniper/contrail-windows-docker-driver/networking_acl"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
@@ -44,7 +45,7 @@ func TestHNSManager(t *testing.T) {
 var _ = BeforeSuite(func() {
 	err := common.HardResetHNS()
 	Expect(err).ToNot(HaveOccurred())
-	err = common.WaitForInterface(common.AdapterName(netAdapter))
+	err = networking_acl.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
 	Expect(err).ToNot(HaveOccurred())
 })
 
@@ -66,7 +67,7 @@ var _ = Describe("HNS manager", func() {
 	AfterEach(func() {
 		err := common.HardResetHNS()
 		Expect(err).ToNot(HaveOccurred())
-		err = common.WaitForInterface(common.AdapterName(netAdapter))
+		err = networking_acl.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
 		Expect(err).ToNot(HaveOccurred())
 	})
 

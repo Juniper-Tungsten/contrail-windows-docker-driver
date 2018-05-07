@@ -24,8 +24,9 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/Microsoft/hcsshim"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
+	"github.com/Juniper/contrail-windows-docker-driver/networking_acl"
+	"github.com/Microsoft/hcsshim"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	"github.com/onsi/ginkgo/reporters"
@@ -58,14 +59,14 @@ func TestHNS(t *testing.T) {
 var _ = BeforeSuite(func() {
 	err := common.HardResetHNS()
 	Expect(err).ToNot(HaveOccurred())
-	err = common.WaitForInterface(common.AdapterName(netAdapter))
+	err = networking_acl.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
 	Expect(err).ToNot(HaveOccurred())
 })
 
 var _ = AfterSuite(func() {
 	err := common.HardResetHNS()
 	Expect(err).ToNot(HaveOccurred())
-	err = common.WaitForInterface(common.AdapterName(netAdapter))
+	err = networking_acl.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
 	Expect(err).ToNot(HaveOccurred())
 })
 
@@ -418,7 +419,7 @@ var _ = Describe("HNS race conditions workarounds", func() {
 		targetAddr = fmt.Sprintf("%s:%v", controllerAddr, controllerPort)
 		err := common.HardResetHNS()
 		Expect(err).ToNot(HaveOccurred())
-		err = common.WaitForInterface(common.AdapterName(netAdapter))
+		err = networking_acl.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
 		Expect(err).ToNot(HaveOccurred())
 	})
 

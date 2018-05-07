@@ -18,6 +18,7 @@ package common
 import (
 	"os"
 	"path/filepath"
+	"time"
 )
 
 const (
@@ -37,34 +38,34 @@ const (
 	// having a virtual switch
 	RootNetworkName = "ContrailRootNetwork"
 
-	// CreateHNSNetworkInitialRetryDelay is a delay (in ms) between consecutive attemps
+	// CreateHNSNetworkInitialRetryDelay is a delay between consecutive attemps
 	// to create HNSNetwork. After each retry, the delay is increased to
 	// give HNS more time to cool down.
-	CreateHNSNetworkInitialRetryDelay = 5 * 1000
+	CreateHNSNetworkInitialRetryDelay = 5 * time.Second
 
-	// CreateHNSNetworkTimeout is maximum waiting time (in ms) for CreateHNSNetwork
+	// CreateHNSNetworkTimeout is maximum waiting time for CreateHNSNetwork
 	// in case of retrying. This should be greater than CreateHNSNetworkInitialRetryDelay
 	// and AdapterReconnectTimeout combined for the retry to be attempted.
-	CreateHNSNetworkTimeout = 90 * 1000
+	CreateHNSNetworkTimeout = 90 * time.Second
 
-	// AdapterReconnectTimeout is a time (in ms) to wait for adapter to reacquire IP after a new
-	// HNS network is created. https://github.com/Microsoft/hcsshim/issues/108
-	AdapterReconnectTimeout = 15000
+	// AdapterReconnectMaxRetries is number of polling retries to wait for adapter
+	// to reacquire IP after a new HNS network is created. https://github.com/Microsoft/hcsshim/issues/108
+	AdapterReconnectMaxRetries = 30
 
-	// AdapterPollingRate is rate (in ms) of polling of network adapter while waiting for it to
+	// AdapterPollingRate is rate of polling of network adapter while waiting for it to
 	// reacquire IP.
-	AdapterPollingRate = 300
+	AdapterPollingRate = 300 * time.Millisecond
 
 	// HNSTransparentInterfaceName is the name of transparent HNS vswitch interface name
 	HNSTransparentInterfaceName = "vEthernet (HNSTransparent)"
 
-	// PipePollingTimeout is time (in ms) to wait for named pipe to appear/disappear in the
+	// PipePollingTimeout is time to wait for named pipe to appear/disappear in the
 	// filesystem
-	PipePollingTimeout = 5000
+	PipePollingTimeout = 5 * time.Second
 
-	// PipePollingRate is rate (in ms) of polling named pipe if it appeared/disappeared in the
+	// PipePollingRate is rate of polling named pipe if it appeared/disappeared in the
 	// filesystem yet
-	PipePollingRate = 300
+	PipePollingRate = 300 * time.Millisecond
 
 	// HyperVExtensionName is the name of vRouter Hyper-V Extension
 	HyperVExtensionName = "vRouter forwarding extension"

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/Juniper/contrail-windows-docker-driver/common"
+	"github.com/Juniper/contrail-windows-docker-driver/networking_acl"
 	"github.com/Microsoft/hcsshim"
 	log "github.com/sirupsen/logrus"
 )
@@ -50,7 +51,7 @@ func tryCreateHNSNetwork(config string) (string, error) {
 	// specified network adapter. This adapter will temporarily lose network connectivity
 	// while it reacquires IPv4. We need to wait for it.
 	// https://github.com/Microsoft/hcsshim/issues/108
-	if err := common.WaitForInterface(common.HNSTransparentInterfaceName); err != nil {
+	if err := networking_acl.WaitForValidIPReacquisition(common.HNSTransparentInterfaceName); err != nil {
 		log.Errorln(err)
 
 		deleteErr := DeleteHNSNetwork(response.Id)
@@ -74,14 +75,14 @@ func CreateHNSNetwork(configuration *hcsshim.HNSNetwork) (string, error) {
 	log.Debugln("Config:", string(configBytes))
 
 	var id = ""
-	delay := time.Millisecond * common.CreateHNSNetworkInitialRetryDelay
+	delay := common.CreateHNSNetworkInitialRetryDelay
 	creatingStart := time.Now()
 	for {
 		id, err = tryCreateHNSNetwork(string(configBytes))
 		if err != nil {
 			if recoverableErr, ok := err.(*recoverableError); ok {
 				err = recoverableErr.inner
-				if time.Since(creatingStart) < time.Millisecond*common.CreateHNSNetworkTimeout {
+				if time.Since(creatingStart) < common.CreateHNSNetworkTimeout {
 					log.Infoln("Creating HNS network failed, retrying.")
 					log.Infoln("Sleeping", delay, "ms")
 					time.Sleep(delay)
@@ -134,7 +135,7 @@ func DeleteHNSNetwork(hnsID string) error {
 		// also deleted. During this period, the adapter will temporarily lose network
 		// connectivity while it reacquires IPv4. We need to wait for it.
 		// https://github.com/Microsoft/hcsshim/issues/95
-		if err := common.WaitForInterface(
+		if err := networking_acl.WaitForValidIPReacquisition(
 			common.AdapterName(toDelete.NetworkAdapterName)); err != nil {
 			log.Errorln(err)
 			return err

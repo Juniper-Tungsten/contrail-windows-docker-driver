@@ -652,7 +652,7 @@ func (d *ContrailDriver) waitForPipeToStop() error {
 func (d *ContrailDriver) waitForPipe(waitUntilExists bool) error {
 	timeStarted := time.Now()
 	for {
-		if time.Since(timeStarted) > time.Millisecond*common.PipePollingTimeout {
+		if time.Since(timeStarted) > common.PipePollingTimeout {
 			return errors.New("Waited for pipe file for too long.")
 		}
 
@@ -666,7 +666,7 @@ func (d *ContrailDriver) waitForPipe(waitUntilExists bool) error {
 			log.Errorf("Waiting for pipe file, but: %s", err)
 		}
 
-		time.Sleep(time.Millisecond * common.PipePollingRate)
+		time.Sleep(common.PipePollingRate)
 	}
 
 	time.Sleep(time.Second * 1)
@@ -681,7 +681,7 @@ func (d *ContrailDriver) waitForPipe(waitUntilExists bool) error {
 func (d *ContrailDriver) waitUntilPipeDialable() error {
 	timeStarted := time.Now()
 	for {
-		if time.Since(timeStarted) > time.Millisecond*common.PipePollingTimeout {
+		if time.Since(timeStarted) > common.PipePollingTimeout {
 			return errors.New("Waited for pipe to be dialable for too long.")
 		}
 
@@ -694,7 +694,7 @@ func (d *ContrailDriver) waitUntilPipeDialable() error {
 
 		log.Errorf("Waiting until dialable, but: %s", err)
 
-		time.Sleep(time.Millisecond * common.PipePollingRate)
+		time.Sleep(common.PipePollingRate)
 	}
 }
 
