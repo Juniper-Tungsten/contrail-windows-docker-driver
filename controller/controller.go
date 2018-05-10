@@ -255,7 +255,6 @@ func (c *Controller) DeleteElementRecursive(parent contrail.IObject) error {
 			break
 		} else if strings.Contains(err.Error(), "409 Conflict") {
 			msg := err.Error()
-			fmt.Println(msg)
 			// example error message when object has children:
 			// `409 Conflict: Delete when children still present:
 			// ['http://10.7.0.54:8082/virtual-network/23e300f4-ab1a-4d97-a1d9-9ed69b601e17']`
