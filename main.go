@@ -24,110 +24,115 @@ import (
 	"os/signal"
 	"strings"
 
-	contrail "github.com/Juniper/contrail-go-api"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/primary/cnm"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/api"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/auth"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hyperv_extension"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/port_association/agent"
+	"github.com/Juniper/contrail-windows-docker-driver/configuration"
 	"github.com/Juniper/contrail-windows-docker-driver/core/driver_core"
 	"github.com/Juniper/contrail-windows-docker-driver/core/vrouter"
 	"github.com/Juniper/contrail-windows-docker-driver/logging"
 	log "github.com/sirupsen/logrus"
 )
 
-func main() {
+var (
+	logPath = flag.String("logPath", logging.DefaultLogFilepath(),
+		"Path to log file.")
+	logLevelString = flag.String("logLevel", "Info",
+		"Log verbosity (possible values: Debug|Info|Warn|Error|Fatal|Panic)")
+	configPath = flag.String("config", configuration.DefaultConfigFilepath(),
+		"Path to configuration file. See cnm-driver.conf.sample for an example.")
+	dryRun = flag.Bool("dryRun", false,
+		"Loads configuration but doesn't run anything. Useful for testing if config file syntax "+
+			"is correct.")
+)
 
-	var adapter = flag.String("adapter", "Ethernet0",
-		"net adapter for HNS switch, must be physical")
-	var controllerIP = flag.String("controllerIP", "127.0.0.1",
-		"IP address of Contrail Controller API")
-	var controllerPort = flag.Int("controllerPort", 8082,
-		"port of Contrail Controller API")
-	var agentURL = flag.String("agentURL", "http://127.0.0.1:9091", "URL of Agent API")
-	var logPath = flag.String("logPath", logging.DefaultLogFilepath(), "log filepath")
-	var logLevelString = flag.String("logLevel", "Info",
-		"log verbosity (possible values: Debug|Info|Warn|Error|Fatal|Panic)")
-	var vswitchNameWildcard = flag.String("vswitchName", "Layered?<adapter>",
-		"Name of Transparent virtual switch. Special wildcard \"<adapter>\" will be interpretted "+
-			"as value of netAdapter parameter. For example, if netAdapter is \"Ethernet0\", then "+
-			"vswitchName will equal \"Layered Ethernet0\". You can use Get-VMSwitch PowerShell "+
-			"command to check how the switch is called on your version of OS.")
-	var os_auth_url = flag.String("os_auth_url", "", "Keystone auth url. If empty, will read "+
-		"from environment variable")
-	var os_username = flag.String("os_username", "", "Contrail username. If empty, "+
-		"will read from environment variable")
-	var os_tenant_name = flag.String("os_tenant_name", "", "Tenant name. If empty, will read "+
-		"environment variable")
-	var os_password = flag.String("os_password", "", "Contrail password. If empty, will read "+
-		"environment variable")
-	var os_token = flag.String("os_token", "", "Keystone token. If empty, will read "+
-		"environment variable")
-	var authMethod = flag.String("authMethod", "keystone", "Controller auth method. Specifying it is mandatory. "+
-		"(possible values: noauth|keystone)")
+func init() {
 	flag.Parse()
+}
 
+func main() {
 	logHook, err := logging.SetupHook(*logPath, *logLevelString)
 	if err != nil {
 		log.Errorf("Setting up logging failed: %s", err)
-		return
+		os.Exit(1)
 	}
 	defer logHook.Close()
 
-	vswitchName := strings.Replace(*vswitchNameWildcard, "<adapter>", *adapter, -1)
-
-	keys := &auth.KeystoneParams{
-		Os_auth_url:    *os_auth_url,
-		Os_username:    *os_username,
-		Os_tenant_name: *os_tenant_name,
-		Os_password:    *os_password,
-		Os_token:       *os_token,
+	cfg, err := loadConfig(*configPath)
+	if err != nil {
+		log.Errorln("Loading config failed:")
+		os.Exit(2)
 	}
-	keys.LoadFromEnvironment()
 
-	hypervExtension := hyperv_extension.NewHyperVvRouterForwardingExtension(vswitchName)
+	if *dryRun {
+		log.Info("Dry run - exiting.")
+		os.Exit(0)
+	}
+
+	err = run(cfg)
+	if err != nil {
+		log.Error(err)
+		os.Exit(3)
+	}
+}
+
+func loadConfig(cfgFilePath string) (*configuration.Configuration, error) {
+	cfg := configuration.NewDefaultConfiguration()
+	if cfgFilePath != "" {
+		err := cfg.LoadFromFile(cfgFilePath)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		cfg.LoadFromCommandLine()
+	}
+
+	cfg.Driver.VSwitchName = strings.Replace(cfg.Driver.VSwitchName, "<adapter>",
+		cfg.Driver.Adapter, -1)
+
+	log.Debugln("Configuration:", cfg)
+	return &cfg, nil
+}
+
+func run(cfg *configuration.Configuration) error {
+	hypervExtension := hyperv_extension.NewHyperVvRouterForwardingExtension(cfg.Driver.VSwitchName)
 	vrouter := vrouter.NewHyperVvRouter(hypervExtension)
 
-	controllerClient := api.NewApiClient(*controllerIP, *controllerPort)
-	controller, err := NewControllerAdapter(*authMethod, controllerClient, keys)
-
+	controller, err := NewControllerAdapter(cfg)
 	if err != nil {
-		log.Error(err)
-		return
+		return err
 	}
 
-	agentUrl, err := url.Parse(*agentURL)
+	agentUrl, err := url.Parse(cfg.Driver.AgentURL)
 	if err != nil {
-		log.Error(err)
-		return
+		return err
 	}
 
 	agent := agent.NewAgentRestAPI(http.DefaultClient, agentUrl)
 
-	netRepo, err := hns.NewHNSContrailNetworksRepository(*adapter)
+	netRepo, err := hns.NewHNSContrailNetworksRepository(cfg.Driver.Adapter)
 	if err != nil {
-		log.Error(err)
-		return
+		return err
 	}
 
 	epRepo := &hns.HNSEndpointRepository{}
 
 	core, err := driver_core.NewContrailDriverCore(vrouter, controller, agent, netRepo, epRepo)
 	if err != nil {
-		log.Error(err)
-		return
+		return err
 	}
 
 	d := cnm.NewServerCNM(core)
 	if err = d.StartServing(); err != nil {
-		log.Error(err)
-		return
+		return err
 	}
 	defer d.StopServing()
 
 	waitForSigInt()
+	return nil
 }
 
 func waitForSigInt() {
@@ -137,11 +142,12 @@ func waitForSigInt() {
 	log.Infoln("Good bye")
 }
 
-func NewControllerAdapter(authMethod string, apiClient *contrail.Client, keys *auth.KeystoneParams) (
+func NewControllerAdapter(cfg *configuration.Configuration) (
 	*controller_rest.ControllerAdapter, error) {
-	switch authMethod {
+	apiClient := api.NewApiClient(cfg.Driver.ControllerIP, cfg.Driver.ControllerPort)
+	switch cfg.Auth.AuthMethod {
 	case "keystone":
-		return controller_rest.NewControllerWithKeystoneAdapter(keys, apiClient)
+		return controller_rest.NewControllerWithKeystoneAdapter(cfg.Auth.Keystone, apiClient)
 	case "noauth":
 		return controller_rest.NewControllerInsecureAdapter(apiClient)
 	default:

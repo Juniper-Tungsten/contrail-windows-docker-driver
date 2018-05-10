@@ -15,6 +15,8 @@
 #
 param([switch] $RunIntegrationTests)
 
+./Scripts/New-BakedTestData.ps1
+
 Write-Host "Running docker driver unit tests..."
 go test -coverpkg=./... -covermode count -coverprofile="cover_unit.out" -tags unit . -- ginkgo.trace
 

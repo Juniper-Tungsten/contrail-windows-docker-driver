@@ -1,6 +1,9 @@
 # build output dir
 build/*
 
+# files generated with go generate
+baked*
+
 # test reports
 *.xml
 

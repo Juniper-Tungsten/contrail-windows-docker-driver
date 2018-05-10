@@ -57,6 +57,12 @@
   revision = "60e002dd61885e1cd909582f00f7eb4da634518a"
 
 [[projects]]
+  name = "github.com/go-ini/ini"
+  packages = ["."]
+  revision = "5cf292cae48347c2490ac1a58fe36735fb78df7e"
+  version = "v1.38.2"
+
+[[projects]]
   name = "github.com/gogo/protobuf"
   packages = ["proto"]
   revision = "1adfc126b41513cc696b209667c8656ea7aac67c"
@@ -144,6 +150,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d7cace29f48658985a8c98f6b44bef9665fda80ac8d49240e742f4268df4eb09"
+  inputs-digest = "c3cace1ee4f70d9019b3caa457d1f3bef6fd634210dc4584fedde9b1d1a81cfe"
   solver-name = "gps-cdcl"
   solver-version = 1

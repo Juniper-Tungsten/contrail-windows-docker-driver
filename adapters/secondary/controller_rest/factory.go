@@ -21,7 +21,7 @@ import (
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/auth"
 )
 
-func NewControllerWithKeystoneAdapter(keys *auth.KeystoneParams, apiClient *contrail.Client) (*ControllerAdapter, error) {
+func NewControllerWithKeystoneAdapter(keys auth.KeystoneParams, apiClient *contrail.Client) (*ControllerAdapter, error) {
 	auth, err := auth.NewKeystoneAuth(keys)
 	if err != nil {
 		return nil, err

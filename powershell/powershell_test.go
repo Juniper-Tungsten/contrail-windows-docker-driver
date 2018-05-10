@@ -44,6 +44,8 @@ var _ = Describe("Powershell wrapper", func() {
 
 	AfterEach(func() {
 		file.Close()
+		err := os.Remove(file.Name())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("returns only stdout if cmdlet didn't fail", func() {

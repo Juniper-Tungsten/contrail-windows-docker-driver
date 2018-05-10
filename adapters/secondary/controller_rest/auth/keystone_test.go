@@ -18,7 +18,6 @@
 package auth_test
 
 import (
-	"os"
 	"testing"
 
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/auth"
@@ -33,54 +32,6 @@ func TestKeystone(t *testing.T) {
 }
 
 var _ = Describe("Keystone", func() {
-	Context("KeystoneParams", func() {
-		type TestCase struct {
-			keys         auth.KeystoneParams
-			expectedKeys auth.KeystoneParams
-		}
-		DescribeTable("LoadFromEnvironment loads empty fields from env",
-			func(t TestCase) {
-				os.Setenv("OS_AUTH_URL", "http://1.3.3.7:5000/v2.0")
-				os.Setenv("OS_USERNAME", "env_username")
-				os.Setenv("OS_TENANT_NAME", "env_tenant")
-				os.Setenv("OS_PASSWORD", "okon")
-				t.keys.LoadFromEnvironment()
-				Expect(t.keys).To(BeEquivalentTo(t.expectedKeys))
-			},
-			Entry("variables present", TestCase{
-				keys: auth.KeystoneParams{
-					Os_auth_url:    "http://1.2.3.4:5000/v2.0",
-					Os_username:    "admin",
-					Os_tenant_name: "admin",
-					Os_password:    "hunter2",
-					Os_token:       "",
-				},
-				expectedKeys: auth.KeystoneParams{
-					Os_auth_url:    "http://1.2.3.4:5000/v2.0",
-					Os_username:    "admin",
-					Os_tenant_name: "admin",
-					Os_password:    "hunter2",
-					Os_token:       "",
-				},
-			}),
-			Entry("variables empty (but are present in envs)", TestCase{
-				keys: auth.KeystoneParams{
-					Os_auth_url:    "",
-					Os_username:    "",
-					Os_tenant_name: "",
-					Os_password:    "",
-					Os_token:       "",
-				},
-				expectedKeys: auth.KeystoneParams{
-					Os_auth_url:    "http://1.3.3.7:5000/v2.0",
-					Os_username:    "env_username",
-					Os_tenant_name: "env_tenant",
-					Os_password:    "okon",
-					Os_token:       "",
-				},
-			}),
-		)
-	})
 
 	Context("NewKeystoneAuth", func() {
 		type TestCase struct {
@@ -89,7 +40,7 @@ var _ = Describe("Keystone", func() {
 		}
 		DescribeTable("NewKeystoneAuth",
 			func(t TestCase) {
-				_, err := auth.NewKeystoneAuth(&t.keys)
+				_, err := auth.NewKeystoneAuth(t.keys)
 				if t.shouldErr {
 					Expect(err).To(HaveOccurred())
 				} else {

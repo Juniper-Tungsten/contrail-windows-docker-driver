@@ -34,8 +34,9 @@ if (-not $SkipExe) {
 
 if (-not $SkipTests) {
     Write-Host "** Building tests..."
-    ginkgo build -r -tags "unit integration" .
+    ./Scripts/New-BakedTestData.ps1
 
+    ginkgo build -r -tags "unit integration" .
     if ($LastExitCode -ne 0) {
         throw "Build failed."
     }
