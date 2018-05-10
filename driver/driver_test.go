@@ -83,12 +83,14 @@ func TestDriver(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	vswitchName = strings.Replace(vswitchNameWildcard, "<adapter>", netAdapter, -1)
-	cleanupAll()
+	// Code disabled: cannot mark 'BeforeSuite' block as Pending...
+	// vswitchName = strings.Replace(vswitchNameWildcard, "<adapter>", netAdapter, -1)
+	// cleanupAll()
 })
 
 var _ = AfterSuite(func() {
-	cleanupAll()
+	// Code disabled: cannot mark 'BeforeSuite' block as Pending...
+	// cleanupAll()
 })
 
 func cleanupAll() {
@@ -129,7 +131,7 @@ type OneTimeListener struct {
 	Received chan (interface{})
 }
 
-var _ = Describe("Contrail Network Driver", func() {
+var _ = PDescribe("Contrail Network Driver", func() {
 
 	BeforeEach(func() {
 		contrailDriver, contrailController, hnsMgr, project = startDriver()
@@ -314,7 +316,7 @@ var _ = Describe("Contrail Network Driver", func() {
 	})
 })
 
-var _ = Describe("On requests from docker daemon", func() {
+var _ = PDescribe("On requests from docker daemon", func() {
 
 	var docker *dockerClient.Client
 

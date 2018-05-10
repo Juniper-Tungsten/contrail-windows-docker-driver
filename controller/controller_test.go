@@ -64,14 +64,15 @@ const (
 )
 
 var _ = BeforeSuite(func() {
-	if useActualController {
-		// this cleans up
-		client, _ := NewClientAndProject(tenantName, controllerAddr, controllerPort)
-		CleanupLingeringVM(client, containerID)
-	}
+	// Code disabled: cannot mark 'BeforeSuite' block as Pending...
+	// if useActualController {
+	// 	// this cleans up
+	// 	client, _ := NewClientAndProject(tenantName, controllerAddr, controllerPort)
+	// 	CleanupLingeringVM(client, containerID)
+	// }
 })
 
-var _ = Describe("Controller", func() {
+var _ = PDescribe("Controller", func() {
 
 	var client *Controller
 	var project *types.Project
@@ -460,7 +461,7 @@ var _ = Describe("Controller", func() {
 	})
 })
 
-var _ = Describe("Authenticating", func() {
+var _ = PDescribe("Authenticating", func() {
 
 	type TestCase struct {
 		shouldErr bool
