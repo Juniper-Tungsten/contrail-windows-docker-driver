@@ -24,6 +24,7 @@ import (
 
 	"github.com/Juniper/contrail-windows-docker-driver/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
+	"github.com/Juniper/contrail-windows-docker-driver/configuration"
 	"github.com/Juniper/contrail-windows-docker-driver/controller"
 	"github.com/Juniper/contrail-windows-docker-driver/driver"
 	"github.com/Juniper/contrail-windows-docker-driver/hnsManager"
@@ -50,6 +51,9 @@ func main() {
 		log.Fatalf("Don't know if the session is interactive: %v", err)
 	}
 
+	////////////////////////////////////////////////////////////////////////////
+	// TODO Remove legacy support for old-style command line parameters
+	//      once CI can handle configuration file.
 	var adapter = flag.String("adapter", "Ethernet0",
 		"net adapter for HNS switch, must be physical")
 	var controllerIP = flag.String("controllerIP", "127.0.0.1",
@@ -78,15 +82,54 @@ func main() {
 		"environment variable")
 	var os_token = flag.String("os_token", "", "Keystone token. If empty, will read "+
 		"environment variable")
-	flag.Parse()
+	////////////////////////////////////////////////////////////////////////////
 
-	if *forceAsInteractive {
+	var configurationFilePath = flag.String("cfg_file", "",
+		"Path to configuration file. See contrail-windows-docker-driver.sample.cfg for an example.")
+	flag.Parse()
+	var config configuration.Configuration
+	if *configurationFilePath != "" {
+		config, err := configuration.LoadConfigurationFromFile(*configurationFilePath)
+		if err != nil {
+			log.Errorf("Could not load configuration file: \"%s\". Error message: \"%s\"", *configurationFilePath, err)
+			return
+		}
+
+		log.Printf("Configuration file \"%s\" has been loaded.", *configurationFilePath)
+		log.Printf("Configuration: %v", config)
+	} else {
+		////////////////////////////////////////////////////////////////////////
+		// TODO Remove legacy support for old-style command line parameters
+		//      once CI can handle configuration file
+		config = configuration.Configuration{
+			configuration.Driver{
+				Adapter:             *adapter,
+				ControllerIP:        *controllerIP,
+				ControllerPort:      *controllerPort,
+				AgentURL:            *agentURL,
+				VSwitchNameWildcard: *vswitchNameWildcard,
+				LogPath:             *logPath,
+				LogLevel:            *logLevelString,
+				ForceAsInteractive:  *forceAsInteractive,
+			},
+			configuration.Keystone{
+				AuthUrl:    *os_auth_url,
+				UserName:   *os_username,
+				TenantName: *os_tenant_name,
+				Password:   *os_password,
+				Token:      *os_token,
+			},
+		}
+		////////////////////////////////////////////////////////////////////////
+	}
+
+	if config.Driver.ForceAsInteractive {
 		isInteractive = true
 	}
 
-	vswitchName := strings.Replace(*vswitchNameWildcard, "<adapter>", *adapter, -1)
+	vswitchName := strings.Replace(config.Driver.VSwitchNameWildcard, "<adapter>", config.Driver.Adapter, -1)
 
-	logHook, err := logging.SetupHook(*logPath, *logLevelString)
+	logHook, err := logging.SetupHook(config.Driver.LogPath, config.Driver.LogLevel)
 	if err != nil {
 		log.Errorf("Setting up logging failed: %s", err)
 		return
@@ -94,19 +137,19 @@ func main() {
 	defer logHook.Close()
 
 	keys := &controller.KeystoneEnvs{
-		Os_auth_url:    *os_auth_url,
-		Os_username:    *os_username,
-		Os_tenant_name: *os_tenant_name,
-		Os_password:    *os_password,
-		Os_token:       *os_token,
+		Os_auth_url:    config.Keystone.AuthUrl,
+		Os_username:    config.Keystone.UserName,
+		Os_tenant_name: config.Keystone.TenantName,
+		Os_password:    config.Keystone.Password,
+		Os_token:       config.Keystone.Token,
 	}
 	keys.LoadFromEnvironment()
 
 	winService := &WinService{
-		adapter:        *adapter,
-		controllerIP:   *controllerIP,
-		controllerPort: *controllerPort,
-		agentURL:       *agentURL,
+		adapter:        config.Driver.Adapter,
+		controllerIP:   config.Driver.ControllerIP,
+		controllerPort: config.Driver.ControllerPort,
+		agentURL:       config.Driver.AgentURL,
 		vswitchName:    vswitchName,
 		keys:           *keys,
 	}
