@@ -22,20 +22,21 @@ import (
 	"github.com/Juniper/contrail-go-api/config"
 	"github.com/Juniper/contrail-go-api/mocks"
 	"github.com/Juniper/contrail-go-api/types"
-	log "github.com/sirupsen/logrus"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/auth"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	. "github.com/onsi/gomega"
+	log "github.com/sirupsen/logrus"
 )
 
-func TestKeystoneEnvs() *KeystoneEnvs {
-	keys := &KeystoneEnvs{}
+func TestKeystoneParams() *auth.KeystoneParams {
+	keys := &auth.KeystoneParams{}
 	keys.LoadFromEnvironment()
 	// try using env variables first, and if they aren't set, use the hardcoded values.
 	if keys.Os_auth_url != "" {
 		log.Warn("OS_AUTH_URL is SET, will use env variables for Keystone auth during testing")
 		return keys
 	} else {
-		return &KeystoneEnvs{
+		return &auth.KeystoneParams{
 			Os_auth_url:    "http://10.7.0.54:5000/v2.0",
 			Os_username:    "admin",
 			Os_tenant_name: "admin",
@@ -60,7 +61,14 @@ func NewMockedClientAndProject(tenant string) (*Controller, *types.Project) {
 
 func NewClientAndProject(tenant, controllerAddr string, controllerPort int) (*Controller,
 	*types.Project) {
-	c, err := NewController(controllerAddr, controllerPort, TestKeystoneEnvs())
+	keys := TestKeystoneParams()
+	keystone, err := auth.NewKeystoneAuth(keys)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = keystone.Authenticate()
+	Expect(err).ToNot(HaveOccurred())
+
+	c, err := NewController(controllerAddr, controllerPort, keystone)
 	Expect(err).ToNot(HaveOccurred())
 
 	ForceDeleteProject(c, tenant)

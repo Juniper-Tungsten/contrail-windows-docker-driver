@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/auth"
 	"github.com/Juniper/contrail-windows-docker-driver/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/controller"
@@ -40,7 +41,7 @@ type WinService struct {
 	agentURL       string
 	vswitchName    string
 	logDir         string
-	keys           controller.KeystoneEnvs
+	keys           auth.KeystoneParams
 }
 
 func main() {
@@ -93,7 +94,7 @@ func main() {
 	}
 	defer logHook.Close()
 
-	keys := &controller.KeystoneEnvs{
+	keys := &auth.KeystoneParams{
 		Os_auth_url:    *os_auth_url,
 		Os_username:    *os_username,
 		Os_tenant_name: *os_tenant_name,
@@ -129,7 +130,19 @@ func (ws *WinService) Execute(args []string, winChangeReqChan <-chan svc.ChangeR
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
 	winStatusChan <- svc.Status{State: svc.StartPending}
 
-	c, err := controller.NewController(ws.controllerIP, ws.controllerPort, &ws.keys)
+	auth, err := auth.NewKeystoneAuth(&ws.keys)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	err = auth.Authenticate()
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	c, err := controller.NewController(ws.controllerIP, ws.controllerPort, auth)
 	if err != nil {
 		log.Error(err)
 		return

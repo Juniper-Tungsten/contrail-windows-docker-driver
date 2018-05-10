@@ -18,8 +18,6 @@ package controller
 import (
 	"errors"
 	"fmt"
-	"os"
-	"reflect"
 	"regexp"
 	"strings"
 
@@ -36,56 +34,10 @@ type Controller struct {
 	ApiClient contrail.ApiClient
 }
 
-type KeystoneEnvs struct {
-	Os_auth_url    string
-	Os_username    string
-	Os_tenant_name string
-	Os_password    string
-	Os_token       string
-}
-
-func (k *KeystoneEnvs) LoadFromEnvironment() {
-
-	k.Os_auth_url = k.GetenvIfNil(k.Os_auth_url, "OS_AUTH_URL")
-	k.Os_username = k.GetenvIfNil(k.Os_username, "OS_USERNAME")
-	k.Os_tenant_name = k.GetenvIfNil(k.Os_tenant_name, "OS_TENANT_NAME")
-	k.Os_password = k.GetenvIfNil(k.Os_password, "OS_PASSWORD")
-	k.Os_token = k.GetenvIfNil(k.Os_token, "OS_TOKEN")
-
-	// print a warning for every empty variable
-	keysReflection := reflect.ValueOf(*k)
-	for i := 0; i < keysReflection.NumField(); i++ {
-		if keysReflection.Field(i).String() == "" {
-			log.Warn("Keystone variable empty: ", keysReflection.Type().Field(i).Name)
-		}
-	}
-	log.Infoln(k)
-}
-
-func (k *KeystoneEnvs) GetenvIfNil(currentVal, envVar string) string {
-	if currentVal == "" {
-		return os.Getenv(envVar)
-	}
-	return currentVal
-}
-
-func NewController(ip string, port int, keys *KeystoneEnvs) (*Controller, error) {
+func NewController(ip string, port int, auth contrail.Authenticator) (*Controller, error) {
 	client := &Controller{}
 	client.ApiClient = contrail.NewClient(ip, port)
-
-	if keys.Os_auth_url == "" {
-		// this corner case is not handled by keystone.Authenticate. Causes panic.
-		return nil, errors.New("Empty Keystone auth URL")
-	}
-
-	keystone := contrail.NewKeepaliveKeystoneClient(keys.Os_auth_url, keys.Os_tenant_name,
-		keys.Os_username, keys.Os_password, keys.Os_token)
-	err := keystone.Authenticate()
-	if err != nil {
-		log.Errorln("Keystone error:", err)
-		return nil, err
-	}
-	client.ApiClient.(*contrail.Client).SetAuthenticator(keystone)
+	client.ApiClient.(*contrail.Client).SetAuthenticator(auth)
 	return client, nil
 }
 
@@ -303,6 +255,7 @@ func (c *Controller) DeleteElementRecursive(parent contrail.IObject) error {
 			break
 		} else if strings.Contains(err.Error(), "409 Conflict") {
 			msg := err.Error()
+			fmt.Println(msg)
 			// example error message when object has children:
 			// `409 Conflict: Delete when children still present:
 			// ['http://10.7.0.54:8082/virtual-network/23e300f4-ab1a-4d97-a1d9-9ed69b601e17']`
