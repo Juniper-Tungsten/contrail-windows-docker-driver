@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017 Juniper Networks, Inc. All Rights Reserved.
+// Copyright (c) 2018 Juniper Networks, Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,11 +45,11 @@ func NewKeystoneAuth(keys *KeystoneParams) (*contrail.KeepaliveKeystoneClient, e
 
 func (k *KeystoneParams) LoadFromEnvironment() {
 
-	k.Os_auth_url = k.getenvIfNil(k.Os_auth_url, "OS_AUTH_URL")
-	k.Os_username = k.getenvIfNil(k.Os_username, "OS_USERNAME")
-	k.Os_tenant_name = k.getenvIfNil(k.Os_tenant_name, "OS_TENANT_NAME")
-	k.Os_password = k.getenvIfNil(k.Os_password, "OS_PASSWORD")
-	k.Os_token = k.getenvIfNil(k.Os_token, "OS_TOKEN")
+	k.Os_auth_url = getenvIfNil(k.Os_auth_url, "OS_AUTH_URL")
+	k.Os_username = getenvIfNil(k.Os_username, "OS_USERNAME")
+	k.Os_tenant_name = getenvIfNil(k.Os_tenant_name, "OS_TENANT_NAME")
+	k.Os_password = getenvIfNil(k.Os_password, "OS_PASSWORD")
+	k.Os_token = getenvIfNil(k.Os_token, "OS_TOKEN")
 
 	// print a warning for every empty variable
 	keysReflection := reflect.ValueOf(*k)
@@ -61,7 +61,7 @@ func (k *KeystoneParams) LoadFromEnvironment() {
 	log.Infoln(k)
 }
 
-func (k *KeystoneParams) getenvIfNil(currentVal, envVar string) string {
+func getenvIfNil(currentVal, envVar string) string {
 	if currentVal == "" {
 		return os.Getenv(envVar)
 	}
