@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package controller
+package controller_test
 
 import (
 	"flag"
@@ -25,6 +25,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/Juniper/contrail-windows-docker-driver/common"
+	. "github.com/Juniper/contrail-windows-docker-driver/controller"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
@@ -71,7 +72,7 @@ var _ = BeforeSuite(func() {
 	// }
 })
 
-var _ = PDescribe("Controller", func() {
+var _ = Describe("Controller", func() {
 
 	var client *Controller
 	var project *types.Project
@@ -110,6 +111,10 @@ var _ = PDescribe("Controller", func() {
 	})
 
 	Specify("recursive deletion removes elements down the ref tree", func() {
+		if !useActualController {
+			Skip("test fails (pending) when using mocked client")
+		}
+
 		testNetwork := CreateMockedNetworkWithSubnet(client.ApiClient, networkName, subnetCIDR,
 			project)
 		testInterface := CreateMockedInterface(client.ApiClient, testNetwork, tenantName,
@@ -192,6 +197,9 @@ var _ = PDescribe("Controller", func() {
 					subnetCIDR, project)
 			})
 			Specify("getting default gw IP returns error", func() {
+				if !useActualController {
+					Skip("test fails (pending) when using mocked client")
+				}
 				ipam, err := client.GetIpamSubnet(testNetwork, "")
 				Expect(err).ToNot(HaveOccurred())
 				if useActualController {
@@ -391,6 +399,9 @@ var _ = PDescribe("Controller", func() {
 				_ = CreateMockedInstance(client.ApiClient, testInterface, containerID)
 			})
 			It("returns MAC address", func() {
+				if !useActualController {
+					Skip("test fails (pending) when using mocked client")
+				}
 				mac, err := client.GetInterfaceMac(testInterface)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(mac).ToNot(Equal("")) // dunno how to get actual MAC when given Instance
@@ -447,6 +458,9 @@ var _ = PDescribe("Controller", func() {
 		})
 		Context("when instance IP doesn't exist in Contrail", func() {
 			It("creates new instance IP", func() {
+				if !useActualController {
+					Skip("test fails (pending) when using mocked client")
+				}
 				instanceIP, err := client.GetOrCreateInstanceIp(testNetwork, testInterface, "")
 				Expect(err).ToNot(HaveOccurred())
 				Expect(instanceIP).ToNot(BeNil())

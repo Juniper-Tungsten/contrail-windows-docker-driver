@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package controller
+package controller_test
 
 import (
 	"fmt"
@@ -24,11 +24,12 @@ import (
 	"github.com/Juniper/contrail-go-api/types"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/auth"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
+	. "github.com/Juniper/contrail-windows-docker-driver/controller"
 	. "github.com/onsi/gomega"
 	log "github.com/sirupsen/logrus"
 )
 
-func TestKeystoneParams() *auth.KeystoneParams {
+func KeystoneTestParams() *auth.KeystoneParams {
 	keys := &auth.KeystoneParams{}
 	keys.LoadFromEnvironment()
 	// try using env variables first, and if they aren't set, use the hardcoded values.
@@ -61,7 +62,7 @@ func NewMockedClientAndProject(tenant string) (*Controller, *types.Project) {
 
 func NewClientAndProject(tenant, controllerAddr string, controllerPort int) (*Controller,
 	*types.Project) {
-	keys := TestKeystoneParams()
+	keys := KeystoneTestParams()
 	keystone, err := auth.NewKeystoneAuth(keys)
 	Expect(err).ToNot(HaveOccurred())
 
