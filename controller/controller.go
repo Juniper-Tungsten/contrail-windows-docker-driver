@@ -286,6 +286,24 @@ func (c *Controller) DeleteElementRecursive(parent contrail.IObject) error {
 					return err
 				}
 			}
+		} else if strings.Contains(err.Error(), "has references") {
+			childrenList, err := c.ApiClient.ListByParent(parent.GetType(), parent.GetUuid())
+			if err != nil {
+				return err
+			}
+			for _, el := range childrenList {
+				log.Debugln(el)
+				typename := el.Fq_name[0]
+				child, err := c.ApiClient.FindByUuid(typename, el.Uuid)
+				if child == nil {
+					return errors.New("Child object is nil")
+				}
+				err = c.DeleteElementRecursive(child)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
 		}
 	}
 	return nil
