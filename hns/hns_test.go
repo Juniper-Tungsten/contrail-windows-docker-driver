@@ -57,17 +57,19 @@ func TestHNS(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	err := common.HardResetHNS()
-	Expect(err).ToNot(HaveOccurred())
-	err = networking_acl.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
-	Expect(err).ToNot(HaveOccurred())
+	// Code disabled: cannot mark 'BeforeSuite' block as Pending...
+	// err := common.HardResetHNS()
+	// Expect(err).ToNot(HaveOccurred())
+	// err = networking_acl.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
+	// Expect(err).ToNot(HaveOccurred())
 })
 
 var _ = AfterSuite(func() {
-	err := common.HardResetHNS()
-	Expect(err).ToNot(HaveOccurred())
-	err = networking_acl.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
-	Expect(err).ToNot(HaveOccurred())
+	// Code disabled: cannot mark 'BeforeSuite' block as Pending...
+	// err := common.HardResetHNS()
+	// Expect(err).ToNot(HaveOccurred())
+	// err = networking_acl.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
+	// Expect(err).ToNot(HaveOccurred())
 })
 
 const (
@@ -77,7 +79,7 @@ const (
 	defaultGW   = "10.0.0.1"
 )
 
-var _ = Describe("HNS wrapper", func() {
+var _ = PDescribe("HNS wrapper", func() {
 
 	var originalNumNetworks int
 
@@ -404,7 +406,7 @@ var _ = Describe("HNS wrapper", func() {
 	})
 })
 
-var _ = Describe("HNS race conditions workarounds", func() {
+var _ = PDescribe("HNS race conditions workarounds", func() {
 
 	var targetAddr string
 	const (

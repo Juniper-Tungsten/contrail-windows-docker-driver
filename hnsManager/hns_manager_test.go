@@ -43,13 +43,14 @@ func TestHNSManager(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	err := common.HardResetHNS()
-	Expect(err).ToNot(HaveOccurred())
-	err = networking_acl.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
-	Expect(err).ToNot(HaveOccurred())
+	// Code disabled: cannot mark 'BeforeSuite' block as Pending...
+	// err := common.HardResetHNS()
+	// Expect(err).ToNot(HaveOccurred())
+	// err = networking_acl.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
+	// Expect(err).ToNot(HaveOccurred())
 })
 
-var _ = Describe("HNS manager", func() {
+var _ = PDescribe("HNS manager", func() {
 
 	const (
 		tenantName  = "agatka"
