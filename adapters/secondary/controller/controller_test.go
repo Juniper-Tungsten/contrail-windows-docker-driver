@@ -24,8 +24,8 @@ import (
 	"github.com/Juniper/contrail-go-api/types"
 	log "github.com/sirupsen/logrus"
 
+	. "github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	. "github.com/Juniper/contrail-windows-docker-driver/controller"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
@@ -79,9 +79,9 @@ var _ = Describe("Controller", func() {
 
 	BeforeEach(func() {
 		if useActualController {
-			client, project = NewClientAndProject(tenantName, controllerAddr, controllerPort)
+			// TODO: Create actual controller instance, like in main.go
 		} else {
-			client, project = NewMockedClientAndProject(tenantName)
+			client, project = NewTestClientAndProject(tenantName)
 		}
 	})
 
@@ -94,19 +94,19 @@ var _ = Describe("Controller", func() {
 	Specify("cleaning up resources that are referred to by two other doesn't fail", func() {
 		// instanceIP and VMI are both referred to by virtual network, and instanceIP refers
 		// to VMI
-		testNetwork := CreateMockedNetworkWithSubnet(client.ApiClient, networkName, subnetCIDR,
+		testNetwork := CreateTestNetworkWithSubnet(client.ApiClient, networkName, subnetCIDR,
 			project)
 		testInterface := CreateMockedInterface(client.ApiClient, testNetwork, tenantName,
 			containerID)
-		_ = CreateMockedInstance(client.ApiClient, testInterface, containerID)
-		_ = CreateMockedInstanceIP(client.ApiClient, tenantName, testInterface,
+		_ = CreateTestInstance(client.ApiClient, testInterface, containerID)
+		_ = CreateTestInstanceIP(client.ApiClient, tenantName, testInterface,
 			testNetwork)
 
 		// shouldn't error when creating new client and project
 		if useActualController {
-			client, project = NewClientAndProject(tenantName, controllerAddr, controllerPort)
+			// TODO: Create actual controller instance, like in main.go
 		} else {
-			client, project = NewMockedClientAndProject(tenantName)
+			client, project = NewTestClientAndProject(tenantName)
 		}
 	})
 
@@ -115,12 +115,12 @@ var _ = Describe("Controller", func() {
 			Skip("test fails (pending) when using mocked client")
 		}
 
-		testNetwork := CreateMockedNetworkWithSubnet(client.ApiClient, networkName, subnetCIDR,
+		testNetwork := CreateTestNetworkWithSubnet(client.ApiClient, networkName, subnetCIDR,
 			project)
 		testInterface := CreateMockedInterface(client.ApiClient, testNetwork, tenantName,
 			containerID)
-		testInstance := CreateMockedInstance(client.ApiClient, testInterface, containerID)
-		testInstanceIP := CreateMockedInstanceIP(client.ApiClient, tenantName, testInterface,
+		testInstance := CreateTestInstance(client.ApiClient, testInterface, containerID)
+		testInstanceIP := CreateTestInstanceIP(client.ApiClient, tenantName, testInterface,
 			testNetwork)
 
 		err := client.DeleteElementRecursive(testInstance)
@@ -141,7 +141,7 @@ var _ = Describe("Controller", func() {
 		Context("when network already exists in Contrail", func() {
 			var testNetwork *types.VirtualNetwork
 			BeforeEach(func() {
-				testNetwork = CreateMockedNetworkWithSubnet(client.ApiClient, networkName,
+				testNetwork = CreateTestNetworkWithSubnet(client.ApiClient, networkName,
 					subnetCIDR, project)
 			})
 			It("returns it", func() {
@@ -170,7 +170,7 @@ var _ = Describe("Controller", func() {
 		Context("network has one subnet with default gateway", func() {
 			var testNetwork *types.VirtualNetwork
 			BeforeEach(func() {
-				testNetwork = CreateMockedNetwork(client.ApiClient, networkName, project)
+				testNetwork = CreateTestNetwork(client.ApiClient, networkName, project)
 				AddSubnetWithDefaultGateway(client.ApiClient, subnetPrefix, defaultGW,
 					subnetMask, testNetwork)
 			})
@@ -193,7 +193,7 @@ var _ = Describe("Controller", func() {
 		Context("network has one subnet without default gateway", func() {
 			var testNetwork *types.VirtualNetwork
 			BeforeEach(func() {
-				testNetwork = CreateMockedNetworkWithSubnet(client.ApiClient, networkName,
+				testNetwork = CreateTestNetworkWithSubnet(client.ApiClient, networkName,
 					subnetCIDR, project)
 			})
 			Specify("getting default gw IP returns error", func() {
@@ -221,7 +221,7 @@ var _ = Describe("Controller", func() {
 		Context("network doesn't have subnets", func() {
 			var testNetwork *types.VirtualNetwork
 			BeforeEach(func() {
-				testNetwork = CreateMockedNetwork(client.ApiClient, networkName, project)
+				testNetwork = CreateTestNetwork(client.ApiClient, networkName, project)
 			})
 			Specify("getting subnet returns error",
 				assertGettingSubnetFails(func() *types.VirtualNetwork {
@@ -239,7 +239,7 @@ var _ = Describe("Controller", func() {
 				cidr2   = "10.20.20.0/24"
 			)
 			BeforeEach(func() {
-				testNetwork = CreateMockedNetwork(client.ApiClient, networkName, project)
+				testNetwork = CreateTestNetwork(client.ApiClient, networkName, project)
 				AddSubnetWithDefaultGateway(client.ApiClient, prefix1, gw1, 24,
 					testNetwork)
 				AddSubnetWithDefaultGateway(client.ApiClient, prefix2, gw2, 24,
@@ -284,7 +284,7 @@ var _ = Describe("Controller", func() {
 	Describe("getting or creating Contrail virtual interface", func() {
 		var testNetwork *types.VirtualNetwork
 		BeforeEach(func() {
-			testNetwork = CreateMockedNetworkWithSubnet(client.ApiClient, networkName, subnetCIDR,
+			testNetwork = CreateTestNetworkWithSubnet(client.ApiClient, networkName, subnetCIDR,
 				project)
 		})
 		Context("when vif already exists in Contrail", func() {
@@ -324,7 +324,7 @@ var _ = Describe("Controller", func() {
 	Describe("getting existing Contrail virtual interface", func() {
 		var testNetwork *types.VirtualNetwork
 		BeforeEach(func() {
-			testNetwork = CreateMockedNetworkWithSubnet(client.ApiClient, networkName, subnetCIDR,
+			testNetwork = CreateTestNetworkWithSubnet(client.ApiClient, networkName, subnetCIDR,
 				project)
 		})
 		Context("when vif already exists in Contrail", func() {
@@ -355,7 +355,7 @@ var _ = Describe("Controller", func() {
 	Describe("getting Contrail instance", func() {
 		var testInterface *types.VirtualMachineInterface
 		BeforeEach(func() {
-			testNetwork := CreateMockedNetworkWithSubnet(client.ApiClient, networkName, subnetCIDR,
+			testNetwork := CreateTestNetworkWithSubnet(client.ApiClient, networkName, subnetCIDR,
 				project)
 			testInterface = CreateMockedInterface(client.ApiClient, testNetwork, tenantName,
 				containerID)
@@ -363,7 +363,7 @@ var _ = Describe("Controller", func() {
 		Context("when instance already exists in Contrail", func() {
 			var testInstance *types.VirtualMachine
 			BeforeEach(func() {
-				testInstance = CreateMockedInstance(client.ApiClient, testInterface, containerID)
+				testInstance = CreateTestInstance(client.ApiClient, testInterface, containerID)
 			})
 			It("returns existing instance", func() {
 				instance, err := client.GetOrCreateInstance(testInterface, containerID)
@@ -389,14 +389,14 @@ var _ = Describe("Controller", func() {
 	Describe("getting virtual interface MAC", func() {
 		var testInterface *types.VirtualMachineInterface
 		BeforeEach(func() {
-			testNetwork := CreateMockedNetworkWithSubnet(client.ApiClient, networkName, subnetCIDR,
+			testNetwork := CreateTestNetworkWithSubnet(client.ApiClient, networkName, subnetCIDR,
 				project)
 			testInterface = CreateMockedInterface(client.ApiClient, testNetwork, tenantName,
 				containerID)
 		})
 		Context("when vif has a VM", func() {
 			BeforeEach(func() {
-				_ = CreateMockedInstance(client.ApiClient, testInterface, containerID)
+				_ = CreateTestInstance(client.ApiClient, testInterface, containerID)
 			})
 			It("returns MAC address", func() {
 				if !useActualController {
@@ -431,16 +431,16 @@ var _ = Describe("Controller", func() {
 		var testInstance *types.VirtualMachine
 		var testInterface *types.VirtualMachineInterface
 		BeforeEach(func() {
-			testNetwork = CreateMockedNetworkWithSubnet(client.ApiClient, networkName, subnetCIDR,
+			testNetwork = CreateTestNetworkWithSubnet(client.ApiClient, networkName, subnetCIDR,
 				project)
 			testInterface = CreateMockedInterface(client.ApiClient, testNetwork, tenantName,
 				containerID)
-			testInstance = CreateMockedInstance(client.ApiClient, testInterface, containerID)
+			testInstance = CreateTestInstance(client.ApiClient, testInterface, containerID)
 		})
 		Context("when instance IP already exists in Contrail", func() {
 			var testInstanceIP *types.InstanceIp
 			BeforeEach(func() {
-				testInstanceIP = CreateMockedInstanceIP(client.ApiClient, tenantName,
+				testInstanceIP = CreateTestInstanceIP(client.ApiClient, tenantName,
 					testInterface, testNetwork)
 			})
 			It("returns existing instance IP", func() {

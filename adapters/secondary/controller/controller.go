@@ -34,11 +34,29 @@ type Controller struct {
 	ApiClient contrail.ApiClient
 }
 
-func NewController(ip string, port int, auth contrail.Authenticator) (*Controller, error) {
+func newController(apiClient contrail.ApiClient) (*Controller, error) {
 	client := &Controller{}
-	client.ApiClient = contrail.NewClient(ip, port)
-	client.ApiClient.(*contrail.Client).SetAuthenticator(auth)
+	client.ApiClient = apiClient
 	return client, nil
+}
+
+func (c *Controller) NewProject(domain, tenant string) (*types.Project, error) {
+	project := new(types.Project)
+	project.SetFQName("domain", []string{common.DomainName, tenant})
+	if err := c.ApiClient.Create(project); err != nil {
+		return nil, err
+	}
+	return project, nil
+}
+
+func (c *Controller) NewDefaultProject(tenant string) (*types.Project, error) {
+	return c.NewProject(common.DomainName, tenant)
+}
+
+func (c *Controller) CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork,
+	error) {
+	// TODO: implement when fixing driver tests
+	return nil, nil
 }
 
 func (c *Controller) GetNetwork(tenantName, networkName string) (*types.VirtualNetwork,

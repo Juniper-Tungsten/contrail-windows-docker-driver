@@ -30,8 +30,8 @@ import (
 	"context"
 
 	"github.com/Juniper/contrail-go-api/types"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	"github.com/Juniper/contrail-windows-docker-driver/controller"
 	"github.com/Juniper/contrail-windows-docker-driver/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/hnsManager"
 	"github.com/Juniper/contrail-windows-docker-driver/hyperv"

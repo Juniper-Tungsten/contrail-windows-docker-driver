@@ -22,10 +22,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/auth"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller/auth"
 	"github.com/Juniper/contrail-windows-docker-driver/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	"github.com/Juniper/contrail-windows-docker-driver/controller"
 	"github.com/Juniper/contrail-windows-docker-driver/driver"
 	"github.com/Juniper/contrail-windows-docker-driver/hnsManager"
 	"github.com/Juniper/contrail-windows-docker-driver/logging"
@@ -130,19 +130,7 @@ func (ws *WinService) Execute(args []string, winChangeReqChan <-chan svc.ChangeR
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
 	winStatusChan <- svc.Status{State: svc.StartPending}
 
-	auth, err := auth.NewKeystoneAuth(&ws.keys)
-	if err != nil {
-		log.Error(err)
-		return
-	}
-
-	err = auth.Authenticate()
-	if err != nil {
-		log.Error(err)
-		return
-	}
-
-	c, err := controller.NewController(ws.controllerIP, ws.controllerPort, auth)
+	c, err := controller.NewControllerWithKeystone(&ws.keys, ws.controllerIP, ws.controllerPort)
 	if err != nil {
 		log.Error(err)
 		return
