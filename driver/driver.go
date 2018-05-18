@@ -30,7 +30,6 @@ import (
 	"context"
 
 	"github.com/Juniper/contrail-go-api/types"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/hnsManager"
@@ -48,7 +47,7 @@ import (
 const hnsEndpointWaitingTime = 5
 
 type ContrailDriver struct {
-	controller         *controller.Controller
+	controller         ControllerPort
 	agent              Agent
 	hnsMgr             *hnsManager.HNSManager
 	networkAdapter     common.AdapterName
@@ -66,7 +65,7 @@ type NetworkMeta struct {
 	subnetCIDR string
 }
 
-func NewDriver(adapter, vswitchName string, c *controller.Controller, agent Agent,
+func NewDriver(adapter, vswitchName string, c ControllerPort, agent Agent,
 	hnsMgr *hnsManager.HNSManager) *ContrailDriver {
 
 	d := &ContrailDriver{
@@ -494,7 +493,7 @@ func (d *ContrailDriver) DeleteEndpoint(req *network.DeleteEndpointRequest) erro
 		}()
 	}
 
-	contrailInstance, err := types.VirtualMachineByName(d.controller.ApiClient, containerID)
+	contrailInstance, err := d.controller.GetInstance(containerID)
 	if err != nil {
 		log.Warn("When handling DeleteEndpoint, Contrail vm instance wasn't found")
 	} else {

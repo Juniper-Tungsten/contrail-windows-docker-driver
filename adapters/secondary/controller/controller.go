@@ -53,9 +53,8 @@ func (c *Controller) NewDefaultProject(tenant string) (*types.Project, error) {
 	return c.NewProject(common.DomainName, tenant)
 }
 
-func (c *Controller) CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork,
-	error) {
-	// TODO: implement when fixing driver tests
+func (c *Controller) CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, error) {
+	// TODO: possibly implement when fixing driver tests
 	return nil, nil
 }
 
@@ -139,7 +138,7 @@ func (c *Controller) GetDefaultGatewayIp(subnet *types.IpamSubnetType) (string, 
 
 func (c *Controller) GetOrCreateInstance(vif *types.VirtualMachineInterface, containerId string) (
 	*types.VirtualMachine, error) {
-	instance, err := types.VirtualMachineByName(c.ApiClient, containerId)
+	instance, err := c.GetInstance(containerId)
 	if err == nil && instance != nil {
 		return instance, nil
 	}
@@ -171,6 +170,16 @@ func (c *Controller) GetOrCreateInstance(vif *types.VirtualMachineInterface, con
 	}
 
 	return createdInstance, nil
+}
+
+func (c *Controller) GetInstance(containerId string) (
+	*types.VirtualMachine, error) {
+	instance, err := types.VirtualMachineByName(c.ApiClient, containerId)
+	if err != nil {
+		log.Errorf("Failed to get virtual machine %s by name: %v", containerId, err)
+		return nil, err
+	}
+	return instance, nil
 }
 
 func (c *Controller) GetExistingInterface(net *types.VirtualNetwork, tenantName,
