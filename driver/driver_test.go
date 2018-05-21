@@ -880,9 +880,9 @@ var _ = PDescribe("On requests from docker daemon", func() {
 func startDriver() (d *driver.ContrailDriver, c driver.ControllerPort, h *hnsManager.HNSManager, p *types.Project) {
 	var err error
 
-	c = controller.NewFakeController()
+	c = controller.NewFakeControllerAdapter()
 
-	p, err = c.NewDefaultProject(tenantName)
+	p, err = c.NewProject(common.DomainName, tenantName)
 	Expect(err).ToNot(HaveOccurred())
 
 	h = &hnsManager.HNSManager{}

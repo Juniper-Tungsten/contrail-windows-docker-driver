@@ -72,9 +72,9 @@ var _ = BeforeSuite(func() {
 	// }
 })
 
-var _ = Describe("Controller", func() {
+var _ = Describe("ControllerAdapter", func() {
 
-	var client *Controller
+	var client *ControllerAdapter
 	var project *types.Project
 
 	BeforeEach(func() {

@@ -20,15 +20,14 @@ import (
 	"github.com/Juniper/contrail-go-api/mocks"
 )
 
-func NewFakeApiClient() contrail.ApiClient {
+func NewFakeApiClient() *mocks.ApiClient {
 	mockedApiClient := new(mocks.ApiClient)
 	mockedApiClient.Init()
 	return mockedApiClient
 }
 
-func NewApiClient(ip string, port int, auth contrail.Authenticator) contrail.ApiClient {
-	var realApiClient contrail.ApiClient
-	realApiClient = contrail.NewClient(ip, port)
-	realApiClient.(*contrail.Client).SetAuthenticator(auth)
+func NewApiClient(ip string, port int, auth contrail.Authenticator) *contrail.Client {
+	realApiClient := contrail.NewClient(ip, port)
+	realApiClient.SetAuthenticator(auth)
 	return realApiClient
 }

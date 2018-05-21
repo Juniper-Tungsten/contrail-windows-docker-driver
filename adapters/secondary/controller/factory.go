@@ -20,7 +20,7 @@ import (
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller/auth"
 )
 
-func NewControllerWithKeystone(keys *auth.KeystoneParams, ip string, port int) (*Controller, error) {
+func NewControllerWithKeystoneAdapter(keys *auth.KeystoneParams, ip string, port int) (*ControllerAdapter, error) {
 	auth, err := auth.NewKeystoneAuth(keys)
 	if err != nil {
 		return nil, err
@@ -33,15 +33,10 @@ func NewControllerWithKeystone(keys *auth.KeystoneParams, ip string, port int) (
 
 	apiClient := api.NewApiClient(ip, port, auth)
 
-	c, err := newController(apiClient)
-	if err != nil {
-		return nil, err
-	}
-	return c, nil
+	return newControllerAdapter(apiClient), nil
 }
 
-func NewFakeController() *Controller {
+func NewFakeControllerAdapter() *ControllerAdapter {
 	fakeApiClient := api.NewFakeApiClient()
-	c, _ := newController(fakeApiClient) // can't fail
-	return c
+	return newControllerAdapter(fakeApiClient)
 }

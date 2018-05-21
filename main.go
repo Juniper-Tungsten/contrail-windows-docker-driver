@@ -130,7 +130,7 @@ func (ws *WinService) Execute(args []string, winChangeReqChan <-chan svc.ChangeR
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
 	winStatusChan <- svc.Status{State: svc.StartPending}
 
-	c, err := controller.NewControllerWithKeystone(&ws.keys, ws.controllerIP, ws.controllerPort)
+	c, err := controller.NewControllerWithKeystoneAdapter(&ws.keys, ws.controllerIP, ws.controllerPort)
 	if err != nil {
 		log.Error(err)
 		return

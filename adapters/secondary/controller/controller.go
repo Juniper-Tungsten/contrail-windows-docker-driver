@@ -30,35 +30,30 @@ import (
 type Info struct {
 }
 
-type Controller struct {
+type ControllerAdapter struct {
 	ApiClient contrail.ApiClient
 }
 
-func newController(apiClient contrail.ApiClient) (*Controller, error) {
-	client := &Controller{}
-	client.ApiClient = apiClient
-	return client, nil
+func newControllerAdapter(apiClient contrail.ApiClient) *ControllerAdapter {
+	client := &ControllerAdapter{ApiClient: apiClient}
+	return client
 }
 
-func (c *Controller) NewProject(domain, tenant string) (*types.Project, error) {
+func (c *ControllerAdapter) NewProject(domain, tenant string) (*types.Project, error) {
 	project := new(types.Project)
-	project.SetFQName("domain", []string{common.DomainName, tenant})
+	project.SetFQName("domain", []string{domain, tenant})
 	if err := c.ApiClient.Create(project); err != nil {
 		return nil, err
 	}
 	return project, nil
 }
 
-func (c *Controller) NewDefaultProject(tenant string) (*types.Project, error) {
-	return c.NewProject(common.DomainName, tenant)
-}
-
-func (c *Controller) CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, error) {
+func (c *ControllerAdapter) CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, error) {
 	// TODO: possibly implement when fixing driver tests
-	return nil, nil
+	return nil, errors.New("Not implemented - possibly TODO when fixing driver module tests.")
 }
 
-func (c *Controller) GetNetwork(tenantName, networkName string) (*types.VirtualNetwork,
+func (c *ControllerAdapter) GetNetwork(tenantName, networkName string) (*types.VirtualNetwork,
 	error) {
 	name := fmt.Sprintf("%s:%s:%s", common.DomainName, tenantName, networkName)
 	net, err := types.VirtualNetworkByName(c.ApiClient, name)
@@ -71,7 +66,7 @@ func (c *Controller) GetNetwork(tenantName, networkName string) (*types.VirtualN
 
 // GetIpamSubnet returns IPAM subnet of specified virtual network with specified CIDR.
 // If virtual network has only one subnet, CIDR is ignored.
-func (c *Controller) GetIpamSubnet(net *types.VirtualNetwork, CIDR string) (
+func (c *ControllerAdapter) GetIpamSubnet(net *types.VirtualNetwork, CIDR string) (
 	*types.IpamSubnetType, error) {
 
 	if strings.HasPrefix(CIDR, "0.0.0.0") {
@@ -126,7 +121,7 @@ func (c *Controller) GetIpamSubnet(net *types.VirtualNetwork, CIDR string) (
 	return nil, err
 }
 
-func (c *Controller) GetDefaultGatewayIp(subnet *types.IpamSubnetType) (string, error) {
+func (c *ControllerAdapter) GetDefaultGatewayIp(subnet *types.IpamSubnetType) (string, error) {
 	gw := subnet.DefaultGateway
 	if gw == "" {
 		err := errors.New("Default GW is empty")
@@ -136,7 +131,7 @@ func (c *Controller) GetDefaultGatewayIp(subnet *types.IpamSubnetType) (string, 
 	return gw, nil
 }
 
-func (c *Controller) GetOrCreateInstance(vif *types.VirtualMachineInterface, containerId string) (
+func (c *ControllerAdapter) GetOrCreateInstance(vif *types.VirtualMachineInterface, containerId string) (
 	*types.VirtualMachine, error) {
 	instance, err := c.GetInstance(containerId)
 	if err == nil && instance != nil {
@@ -172,7 +167,7 @@ func (c *Controller) GetOrCreateInstance(vif *types.VirtualMachineInterface, con
 	return createdInstance, nil
 }
 
-func (c *Controller) GetInstance(containerId string) (
+func (c *ControllerAdapter) GetInstance(containerId string) (
 	*types.VirtualMachine, error) {
 	instance, err := types.VirtualMachineByName(c.ApiClient, containerId)
 	if err != nil {
@@ -182,7 +177,7 @@ func (c *Controller) GetInstance(containerId string) (
 	return instance, nil
 }
 
-func (c *Controller) GetExistingInterface(net *types.VirtualNetwork, tenantName,
+func (c *ControllerAdapter) GetExistingInterface(net *types.VirtualNetwork, tenantName,
 	containerId string) (*types.VirtualMachineInterface, error) {
 
 	fqName := fmt.Sprintf("%s:%s:%s", common.DomainName, tenantName, containerId)
@@ -198,7 +193,7 @@ func (c *Controller) GetExistingInterface(net *types.VirtualNetwork, tenantName,
 	return nil, errors.New("Interface does not exist")
 }
 
-func (c *Controller) GetOrCreateInterface(net *types.VirtualNetwork, tenantName,
+func (c *ControllerAdapter) GetOrCreateInterface(net *types.VirtualNetwork, tenantName,
 	containerId string) (*types.VirtualMachineInterface, error) {
 
 	fqName := fmt.Sprintf("%s:%s:%s", common.DomainName, tenantName, containerId)
@@ -229,7 +224,7 @@ func (c *Controller) GetOrCreateInterface(net *types.VirtualNetwork, tenantName,
 	return createdIface, nil
 }
 
-func (c *Controller) GetInterfaceMac(iface *types.VirtualMachineInterface) (string, error) {
+func (c *ControllerAdapter) GetInterfaceMac(iface *types.VirtualMachineInterface) (string, error) {
 	macs := iface.GetVirtualMachineInterfaceMacAddresses()
 	if len(macs.MacAddress) == 0 {
 		err := errors.New("Empty MAC list")
@@ -239,7 +234,7 @@ func (c *Controller) GetInterfaceMac(iface *types.VirtualMachineInterface) (stri
 	return macs.MacAddress[0], nil
 }
 
-func (c *Controller) GetOrCreateInstanceIp(net *types.VirtualNetwork,
+func (c *ControllerAdapter) GetOrCreateInstanceIp(net *types.VirtualNetwork,
 	iface *types.VirtualMachineInterface, subnetUuid string) (*types.InstanceIp, error) {
 	instIp, err := types.InstanceIpByName(c.ApiClient, iface.GetName())
 	if err == nil && instIp != nil {
@@ -274,7 +269,7 @@ func (c *Controller) GetOrCreateInstanceIp(net *types.VirtualNetwork,
 	return allocatedIP, nil
 }
 
-func (c *Controller) DeleteElementRecursive(parent contrail.IObject) error {
+func (c *ControllerAdapter) DeleteElementRecursive(parent contrail.IObject) error {
 	log.Debugln("Deleting", parent.GetType(), parent.GetUuid())
 	for err := c.ApiClient.Delete(parent); err != nil; err = c.ApiClient.Delete(parent) {
 		if strings.Contains(err.Error(), "404 Resource") {

@@ -23,7 +23,6 @@ import (
 // TODO: This interface can be simplified
 type ControllerPort interface {
 	NewProject(domain, tenant string) (*types.Project, error)
-	NewDefaultProject(tenant string) (*types.Project, error)
 
 	CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, error)
 	GetNetwork(tenantName, networkName string) (*types.VirtualNetwork, error)

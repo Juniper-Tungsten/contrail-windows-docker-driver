@@ -27,10 +27,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func NewTestClientAndProject(tenant string) (*controller.Controller, *types.Project) {
-	c := controller.NewFakeController()
+func NewTestClientAndProject(tenant string) (*controller.ControllerAdapter, *types.Project) {
+	c := controller.NewFakeControllerAdapter()
 
-	project, err := c.NewDefaultProject(tenant)
+	project, err := c.NewProject(common.DomainName, tenant)
 	Expect(err).ToNot(HaveOccurred())
 	return c, project
 }
@@ -134,7 +134,7 @@ func CreateTestInstanceIP(c contrail.ApiClient, tenantName string,
 	return allocatedIP
 }
 
-func ForceDeleteProject(c *controller.Controller, tenant string) {
+func ForceDeleteProject(c *controller.ControllerAdapter, tenant string) {
 	projToDelete, _ := c.ApiClient.FindByName("project", fmt.Sprintf("%s:%s", common.DomainName,
 		tenant))
 	if projToDelete != nil {
@@ -142,7 +142,7 @@ func ForceDeleteProject(c *controller.Controller, tenant string) {
 	}
 }
 
-func CleanupLingeringVM(c *controller.Controller, containerID string) {
+func CleanupLingeringVM(c *controller.ControllerAdapter, containerID string) {
 	instance, err := types.VirtualMachineByName(c.ApiClient, containerID)
 	if err == nil {
 		log.Debugln("Cleaning up lingering test vm", instance.GetUuid())
