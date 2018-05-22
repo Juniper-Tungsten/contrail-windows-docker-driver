@@ -13,75 +13,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package controller
+package controller_test
 
 import (
 	"fmt"
 
 	contrail "github.com/Juniper/contrail-go-api"
 	"github.com/Juniper/contrail-go-api/config"
-	"github.com/Juniper/contrail-go-api/mocks"
 	"github.com/Juniper/contrail-go-api/types"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/auth"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	. "github.com/onsi/gomega"
 	log "github.com/sirupsen/logrus"
 )
 
-func TestKeystoneParams() *auth.KeystoneParams {
-	keys := &auth.KeystoneParams{}
-	keys.LoadFromEnvironment()
-	// try using env variables first, and if they aren't set, use the hardcoded values.
-	if keys.Os_auth_url != "" {
-		log.Warn("OS_AUTH_URL is SET, will use env variables for Keystone auth during testing")
-		return keys
-	} else {
-		return &auth.KeystoneParams{
-			Os_auth_url:    "http://10.7.0.54:5000/v2.0",
-			Os_username:    "admin",
-			Os_tenant_name: "admin",
-			Os_password:    "secret123",
-			Os_token:       "",
-		}
-	}
-}
+func NewTestClientAndProject(tenant string) (*controller.ControllerAdapter, *types.Project) {
+	c := controller.NewFakeControllerAdapter()
 
-func NewMockedClientAndProject(tenant string) (*Controller, *types.Project) {
-	c := &Controller{}
-	mockedApiClient := new(mocks.ApiClient)
-	mockedApiClient.Init()
-	c.ApiClient = mockedApiClient
-
-	project := new(types.Project)
-	project.SetFQName("domain", []string{common.DomainName, tenant})
-	err := c.ApiClient.Create(project)
+	project, err := c.NewProject(common.DomainName, tenant)
 	Expect(err).ToNot(HaveOccurred())
 	return c, project
 }
 
-func NewClientAndProject(tenant, controllerAddr string, controllerPort int) (*Controller,
-	*types.Project) {
-	keys := TestKeystoneParams()
-	keystone, err := auth.NewKeystoneAuth(keys)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = keystone.Authenticate()
-	Expect(err).ToNot(HaveOccurred())
-
-	c, err := NewController(controllerAddr, controllerPort, keystone)
-	Expect(err).ToNot(HaveOccurred())
-
-	ForceDeleteProject(c, tenant)
-
-	project := new(types.Project)
-	project.SetFQName("domain", []string{common.DomainName, tenant})
-	Expect(err).ToNot(HaveOccurred())
-	err = c.ApiClient.Create(project)
-	Expect(err).ToNot(HaveOccurred())
-	return c, project
-}
-
-func CreateMockedNetworkWithSubnet(c contrail.ApiClient, netName, subnetCIDR string,
+func CreateTestNetworkWithSubnet(c contrail.ApiClient, netName, subnetCIDR string,
 	project *types.Project) *types.VirtualNetwork {
 	netUUID, err := config.CreateNetworkWithSubnet(c, project.GetUuid(), netName, subnetCIDR)
 	Expect(err).ToNot(HaveOccurred())
@@ -92,7 +46,7 @@ func CreateMockedNetworkWithSubnet(c contrail.ApiClient, netName, subnetCIDR str
 	return testNetwork
 }
 
-func CreateMockedNetwork(c contrail.ApiClient, netName string,
+func CreateTestNetwork(c contrail.ApiClient, netName string,
 	project *types.Project) *types.VirtualNetwork {
 	netUUID, err := config.CreateNetwork(c, project.GetUuid(), netName)
 	Expect(err).ToNot(HaveOccurred())
@@ -123,7 +77,7 @@ func AddSubnetWithDefaultGateway(c contrail.ApiClient, subnetPrefix, defaultGW s
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func CreateMockedInstance(c contrail.ApiClient, vif *types.VirtualMachineInterface,
+func CreateTestInstance(c contrail.ApiClient, vif *types.VirtualMachineInterface,
 	containerID string) *types.VirtualMachine {
 	testInstance := new(types.VirtualMachine)
 	testInstance.SetName(containerID)
@@ -163,7 +117,7 @@ func AddMacToInterface(c contrail.ApiClient, ifaceMac string,
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func CreateMockedInstanceIP(c contrail.ApiClient, tenantName string,
+func CreateTestInstanceIP(c contrail.ApiClient, tenantName string,
 	iface *types.VirtualMachineInterface,
 	net *types.VirtualNetwork) *types.InstanceIp {
 	instIP := &types.InstanceIp{}
@@ -180,7 +134,7 @@ func CreateMockedInstanceIP(c contrail.ApiClient, tenantName string,
 	return allocatedIP
 }
 
-func ForceDeleteProject(c *Controller, tenant string) {
+func ForceDeleteProject(c *controller.ControllerAdapter, tenant string) {
 	projToDelete, _ := c.ApiClient.FindByName("project", fmt.Sprintf("%s:%s", common.DomainName,
 		tenant))
 	if projToDelete != nil {
@@ -188,7 +142,7 @@ func ForceDeleteProject(c *Controller, tenant string) {
 	}
 }
 
-func CleanupLingeringVM(c *Controller, containerID string) {
+func CleanupLingeringVM(c *controller.ControllerAdapter, containerID string) {
 	instance, err := types.VirtualMachineByName(c.ApiClient, containerID)
 	if err == nil {
 		log.Debugln("Cleaning up lingering test vm", instance.GetUuid())
