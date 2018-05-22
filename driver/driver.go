@@ -47,7 +47,7 @@ import (
 const hnsEndpointWaitingTime = 5
 
 type ContrailDriver struct {
-	controller         ControllerPort
+	controller         Controller
 	agent              Agent
 	hnsMgr             *hnsManager.HNSManager
 	networkAdapter     common.AdapterName
@@ -65,7 +65,7 @@ type NetworkMeta struct {
 	subnetCIDR string
 }
 
-func NewDriver(adapter, vswitchName string, c ControllerPort, agent Agent,
+func NewDriver(adapter, vswitchName string, c Controller, agent Agent,
 	hnsMgr *hnsManager.HNSManager) *ContrailDriver {
 
 	d := &ContrailDriver{

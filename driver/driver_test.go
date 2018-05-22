@@ -112,7 +112,7 @@ func getDockerNetwork(docker *dockerClient.Client, dockerNetID string) (dockerTy
 	return docker.NetworkInspect(context.Background(), dockerNetID, inspectOptions)
 }
 
-var contrailController driver.ControllerPort
+var contrailController driver.Controller
 var contrailDriver *driver.ContrailDriver
 var hnsMgr *hnsManager.HNSManager
 var project *types.Project
@@ -450,7 +450,7 @@ var _ = PDescribe("On requests from docker daemon", func() {
 			Expect(err).To(HaveOccurred())
 		}
 		assertDoesNotRemoveContrailNet := func() {
-			// TODO: This test must be rewritten using ControllerPort interface.
+			// TODO: This test must be rewritten using Controller interface.
 			// In other words, it mustn't access ApiClient field.
 
 			// 	net, err := types.VirtualNetworkByName(contrailController.ApiClient,
@@ -532,7 +532,7 @@ var _ = PDescribe("On requests from docker daemon", func() {
 				close(done)
 			})
 			PIt("allocates Contrail resources", func() {
-				// TODO: This test must be rewritten using ControllerPort interface.
+				// TODO: This test must be rewritten using Controller interface.
 				// In other words, it mustn't access ApiClient field.
 
 				// 	net, err := types.VirtualNetworkByName(contrailController.ApiClient,
@@ -617,7 +617,7 @@ var _ = PDescribe("On requests from docker daemon", func() {
 	})
 
 	// TODO: This Context is marked as Pending, because BeforeEach block must be
-	// rewritten using ControllerPort interface.
+	// rewritten using Controller interface.
 	PContext("on DeleteEndpoint request", func() {
 
 		// dockerNetID := ""
@@ -630,7 +630,7 @@ var _ = PDescribe("On requests from docker daemon", func() {
 		var mockAgentListener *OneTimeListener
 
 		BeforeEach(func() {
-			// TODO: This BeforeEach must be rewritten using ControllerPort interface.
+			// TODO: This BeforeEach must be rewritten using Controller interface.
 			// In other words, it mustn't access ApiClient field.
 
 			// mockAgentListener = startMockAgentListener()
@@ -681,7 +681,7 @@ var _ = PDescribe("On requests from docker daemon", func() {
 		}
 
 		assertRemovesContrailVM := func() {
-			// TODO: This test must be rewritten using ControllerPort interface.
+			// TODO: This test must be rewritten using Controller interface.
 			// In other words, it mustn't access ApiClient field.
 
 			// _, err := types.VirtualMachineByName(contrailController.ApiClient,
@@ -877,7 +877,7 @@ var _ = PDescribe("On requests from docker daemon", func() {
 	})
 })
 
-func startDriver() (d *driver.ContrailDriver, c driver.ControllerPort, h *hnsManager.HNSManager, p *types.Project) {
+func startDriver() (d *driver.ContrailDriver, c driver.Controller, h *hnsManager.HNSManager, p *types.Project) {
 	var err error
 
 	c = controller.NewFakeControllerAdapter()
@@ -985,7 +985,7 @@ func cleanupAllDockerNetworksAndContainers(docker *dockerClient.Client) {
 	}
 }
 
-func createTestContrailNetwork(c driver.ControllerPort) *types.VirtualNetwork {
+func createTestContrailNetwork(c driver.Controller) *types.VirtualNetwork {
 	network, err := c.CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR)
 	Expect(err).ToNot(HaveOccurred())
 	return network
@@ -1011,7 +1011,7 @@ func getTheOnlyHNSEndpoint(d *driver.ContrailDriver) (*hcsshim.HNSEndpoint, stri
 	return hnsEndpoint, hnsEndpointID
 }
 
-func setupNetworksAndEndpoints(c driver.ControllerPort, docker *dockerClient.Client) (
+func setupNetworksAndEndpoints(c driver.Controller, docker *dockerClient.Client) (
 	*types.VirtualNetwork, string, string) {
 	contrailNet := createTestContrailNetwork(c)
 	dockerNetID := createValidDockerNetwork(docker)

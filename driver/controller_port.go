@@ -21,7 +21,7 @@ import (
 )
 
 // TODO: This interface can be simplified
-type ControllerPort interface {
+type Controller interface {
 	NewProject(domain, tenant string) (*types.Project, error)
 
 	CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, error)
