@@ -306,17 +306,44 @@ var _ = Describe("ControllerAdapter", func() {
 				Expect(iface.GetFQName()).To(Equal([]string{common.DomainName, tenantName,
 					containerID}))
 			})
-		})
-		Context("when vif doesn't exist in Contrail", func() {
-			It("creates a new vif", func() {
+			It("does not change vif security group", func() {
 				iface, err := client.GetOrCreateInterface(testNetwork, tenantName, containerID)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(iface).ToNot(BeNil())
-
-				existingIface, err := types.VirtualMachineInterfaceByUuid(client.ApiClient,
-					iface.GetUuid())
-				Expect(err).ToNot(HaveOccurred())
-				Expect(existingIface.GetUuid()).To(Equal(iface.GetUuid()))
+				Expect(iface.GetSecurityGroupRefs()).To(BeNil())
+				Expect(iface.GetPortSecurityEnabled()).To(BeFalse())
+			})
+		})
+		Context("when vif doesn't exist in Contrail", func() {
+			Context("when default security group exists", func() {
+				BeforeEach(func() {
+					CreateTestSecurityGroup(client.ApiClient, "default", project)
+				})
+				It("creates a new vif", func() {
+					iface, err := client.GetOrCreateInterface(testNetwork, tenantName, containerID)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(iface).ToNot(BeNil())
+					existingIface, err := types.VirtualMachineInterfaceByUuid(client.ApiClient,
+						iface.GetUuid())
+					Expect(err).ToNot(HaveOccurred())
+					Expect(existingIface.GetUuid()).To(Equal(iface.GetUuid()))
+				})
+				It("adds the vif to default security group and enables port security", func() {
+					iface, err := client.GetOrCreateInterface(testNetwork, tenantName, containerID)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(iface).ToNot(BeNil())
+					existingIface, err := types.VirtualMachineInterfaceByUuid(client.ApiClient,
+						iface.GetUuid())
+					Expect(existingIface.GetSecurityGroupRefs()).ToNot(BeNil())
+					Expect(existingIface.GetPortSecurityEnabled()).To(BeTrue())
+				})
+			})
+			Context("when default security group doesn't exist", func() {
+				It("returns an error", func() {
+					iface, err := client.GetOrCreateInterface(testNetwork, tenantName, containerID)
+					Expect(err).To(HaveOccurred())
+					Expect(iface).To(BeNil())
+				})
 			})
 		})
 	})

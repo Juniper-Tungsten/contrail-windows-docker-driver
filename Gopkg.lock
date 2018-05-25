@@ -5,7 +5,7 @@
   branch = "windows"
   name = "github.com/Juniper/contrail-go-api"
   packages = [".","config","mocks"]
-  revision = "8579171c2b8ab07952d53515848039b90417272b"
+  revision = "7afd0369200400a595f9b147169028fda0b27d1a"
   source = "github.com/codilime/contrail-go-api"
 
 [[projects]]

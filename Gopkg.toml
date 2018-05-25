@@ -40,10 +40,6 @@ ignored = ["github.com/Juniper/contrail-go-api/types"]
   revision = "60e002dd61885e1cd909582f00f7eb4da634518a"
 
 [[constraint]]
-  name = "github.com/kardianos/osext"
-  revision = "ae77be60afb1dcacde03767a8c37337fad28ac14"
-
-[[constraint]]
   name = "github.com/onsi/ginkgo"
   revision = "11459a886d9cd66b319dac7ef1e917ee221372c9"
 

@@ -57,6 +57,15 @@ func CreateTestNetwork(c contrail.ApiClient, netName string,
 	return testNetwork
 }
 
+func CreateTestSecurityGroup(c contrail.ApiClient, groupName string,
+	project *types.Project) *types.SecurityGroup {
+	group := new(types.SecurityGroup)
+	group.SetFQName("project", []string{common.DomainName, project.GetName(), groupName})
+	err := c.Create(group)
+	Expect(err).ToNot(HaveOccurred())
+	return group
+}
+
 func AddSubnetWithDefaultGateway(c contrail.ApiClient, subnetPrefix, defaultGW string,
 	subnetMask int, testNetwork *types.VirtualNetwork) {
 	subnet := &types.IpamSubnetType{

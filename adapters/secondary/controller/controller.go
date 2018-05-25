@@ -134,8 +134,11 @@ func (c *ControllerAdapter) GetDefaultGatewayIp(subnet *types.IpamSubnetType) (s
 func (c *ControllerAdapter) GetOrCreateInstance(vif *types.VirtualMachineInterface, containerId string) (
 	*types.VirtualMachine, error) {
 	instance, err := c.GetInstance(containerId)
-	if err == nil && instance != nil {
+	if err == nil {
 		return instance, nil
+	} else if !c.is404(err) {
+		log.Errorf("Failed to get instance: %v", err)
+		return nil, err
 	}
 
 	instance = new(types.VirtualMachine)
@@ -169,12 +172,7 @@ func (c *ControllerAdapter) GetOrCreateInstance(vif *types.VirtualMachineInterfa
 
 func (c *ControllerAdapter) GetInstance(containerId string) (
 	*types.VirtualMachine, error) {
-	instance, err := types.VirtualMachineByName(c.ApiClient, containerId)
-	if err != nil {
-		log.Errorf("Failed to get virtual machine %s by name: %v", containerId, err)
-		return nil, err
-	}
-	return instance, nil
+	return types.VirtualMachineByName(c.ApiClient, containerId)
 }
 
 func (c *ControllerAdapter) GetExistingInterface(net *types.VirtualNetwork, tenantName,
@@ -209,6 +207,14 @@ func (c *ControllerAdapter) GetOrCreateInterface(net *types.VirtualNetwork, tena
 		log.Errorf("Failed to add network to interface: %v", err)
 		return nil, err
 	}
+
+	iface.SetPortSecurityEnabled(true)
+	err = c.assignDefaultSecurityGroup(iface, tenantName)
+	if err != nil {
+		log.Errorf("Failed to add security group to interface: %v", err)
+		return nil, err
+	}
+
 	err = c.ApiClient.Create(iface)
 	if err != nil {
 		log.Errorf("Failed to create interface: %v", err)
@@ -217,11 +223,21 @@ func (c *ControllerAdapter) GetOrCreateInterface(net *types.VirtualNetwork, tena
 
 	createdIface, err := types.VirtualMachineInterfaceByName(c.ApiClient, fqName)
 	if err != nil {
-		log.Errorf("Failed to retreive vmi %s by name: %v", fqName, err)
+		log.Errorf("Failed to retrieve vmi %s by name: %v", fqName, err)
 		return nil, err
 	}
 	log.Infoln("Created instance: ", createdIface.GetFQName())
 	return createdIface, nil
+}
+
+func (c *ControllerAdapter) assignDefaultSecurityGroup(iface *types.VirtualMachineInterface, tenantName string) error {
+	secGroupFqName := fmt.Sprintf("%s:%s:default", common.DomainName, tenantName)
+	secGroup, err := types.SecurityGroupByName(c.ApiClient, secGroupFqName)
+	if err != nil || secGroup == nil {
+		return fmt.Errorf("Failed to retrieve security group %s by name: %v", secGroupFqName, err)
+
+	}
+	return iface.AddSecurityGroup(secGroup)
 }
 
 func (c *ControllerAdapter) GetInterfaceMac(iface *types.VirtualMachineInterface) (string, error) {
@@ -272,6 +288,7 @@ func (c *ControllerAdapter) GetOrCreateInstanceIp(net *types.VirtualNetwork,
 func (c *ControllerAdapter) DeleteElementRecursive(parent contrail.IObject) error {
 	log.Debugln("Deleting", parent.GetType(), parent.GetUuid())
 	for err := c.ApiClient.Delete(parent); err != nil; err = c.ApiClient.Delete(parent) {
+		// TODO: when fixing this method, consider using c.is404() method.
 		if strings.Contains(err.Error(), "404 Resource") {
 			log.Errorln("Failed to delete Contrail resource", err.Error())
 			break
@@ -311,4 +328,8 @@ func (c *ControllerAdapter) DeleteElementRecursive(parent contrail.IObject) erro
 		}
 	}
 	return nil
+}
+
+func (c *ControllerAdapter) is404(err error) bool {
+	return strings.HasPrefix(err.Error(), "404")
 }
