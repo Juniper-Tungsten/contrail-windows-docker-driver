@@ -1,0 +1,47 @@
+# Custom build script
+build.ps1
+*.xml
+
+# Created by https://www.gitignore.io/api/go,visualstudiocode
+
+### Go ###
+# Compiled Object files, Static and Dynamic libs (Shared Objects)
+*.o
+*.a
+*.so
+
+# Folders
+_obj
+_test
+
+# Architecture specific extensions/prefixes
+*.[568vq]
+[568vq].out
+
+*.cgo1.go
+*.cgo2.c
+_cgo_defun.c
+_cgo_gotypes.go
+_cgo_export.*
+
+_testmain.go
+
+*.exe
+*.test
+*.prof
+*.coverprofile
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+### VisualStudioCode ###
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+.vscode/launch.json
+
+### Delve debugger temporary executable ###
+/debug
+
+# Vendor code, it is pulled by dependency manager
+vendor/*
