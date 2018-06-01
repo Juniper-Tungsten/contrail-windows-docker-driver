@@ -13,16 +13,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package hnsManager
+package hnsManager_integration_test
 
 import (
 	"flag"
 	"fmt"
 	"testing"
 
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns/win_networking"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	"github.com/Juniper/contrail-windows-docker-driver/hns"
-	"github.com/Juniper/contrail-windows-docker-driver/networking_acl"
+	"github.com/Juniper/contrail-windows-docker-driver/hnsManager"
+	"github.com/Juniper/contrail-windows-docker-driver/integration_tests/helpers"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
@@ -46,7 +48,7 @@ var _ = BeforeSuite(func() {
 	// Code disabled: cannot mark 'BeforeSuite' block as Pending...
 	// err := common.HardResetHNS()
 	// Expect(err).ToNot(HaveOccurred())
-	// err = networking_acl.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
+	// err = win_networking.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
 	// Expect(err).ToNot(HaveOccurred())
 })
 
@@ -59,16 +61,16 @@ var _ = PDescribe("HNS manager", func() {
 		defaultGW   = "10.0.0.1"
 	)
 
-	var hnsMgr *HNSManager
+	var hnsMgr *hnsManager.HNSManager
 
 	BeforeEach(func() {
-		hnsMgr = &HNSManager{}
+		hnsMgr = &hnsManager.HNSManager{}
 	})
 
 	AfterEach(func() {
 		err := common.HardResetHNS()
 		Expect(err).ToNot(HaveOccurred())
-		err = networking_acl.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
+		err = win_networking.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -89,7 +91,7 @@ var _ = PDescribe("HNS manager", func() {
 		var existingNetID string
 		BeforeEach(func() {
 			hnsNetName := fmt.Sprintf("Contrail:%s:%s:%s", tenantName, networkName, subnetCIDR)
-			existingNetID = hns.MockHNSNetwork(common.AdapterName(netAdapter), hnsNetName,
+			existingNetID = helpers.CreateTestHNSNetwork(common.AdapterName(netAdapter), hnsNetName,
 				subnetCIDR, defaultGW)
 		})
 
@@ -112,7 +114,7 @@ var _ = PDescribe("HNS manager", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(eps).To(BeEmpty())
 
-				_ = hns.MockHNSEndpoint(existingNetID)
+				_ = helpers.CreateTestHNSEndpoint(existingNetID)
 
 				eps, err = hns.ListHNSEndpoints()
 				Expect(err).ToNot(HaveOccurred())
@@ -153,7 +155,7 @@ var _ = PDescribe("HNS manager", func() {
 				"some_other_name",
 			}
 			for _, n := range names {
-				hns.MockHNSNetwork(common.AdapterName(netAdapter), n, subnetCIDR, defaultGW)
+				helpers.CreateTestHNSNetwork(common.AdapterName(netAdapter), n, subnetCIDR, defaultGW)
 			}
 		})
 		Specify("Listing only Contrail networks works", func() {

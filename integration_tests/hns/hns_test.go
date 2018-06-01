@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package hns
+package hns_integration_test
 
 import (
 	"flag"
@@ -24,8 +24,10 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns/win_networking"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	"github.com/Juniper/contrail-windows-docker-driver/networking_acl"
+	"github.com/Juniper/contrail-windows-docker-driver/integration_tests/helpers"
 	"github.com/Microsoft/hcsshim"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
@@ -60,7 +62,7 @@ var _ = BeforeSuite(func() {
 	// Code disabled: cannot mark 'BeforeSuite' block as Pending...
 	// err := common.HardResetHNS()
 	// Expect(err).ToNot(HaveOccurred())
-	// err = networking_acl.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
+	// err = win_networking.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
 	// Expect(err).ToNot(HaveOccurred())
 })
 
@@ -68,7 +70,7 @@ var _ = AfterSuite(func() {
 	// Code disabled: cannot mark 'BeforeSuite' block as Pending...
 	// err := common.HardResetHNS()
 	// Expect(err).ToNot(HaveOccurred())
-	// err = networking_acl.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
+	// err = win_networking.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
 	// Expect(err).ToNot(HaveOccurred())
 })
 
@@ -84,7 +86,7 @@ var _ = PDescribe("HNS wrapper", func() {
 	var originalNumNetworks int
 
 	BeforeEach(func() {
-		nets, err := ListHNSNetworks()
+		nets, err := hns.ListHNSNetworks()
 		Expect(err).ToNot(HaveOccurred())
 		originalNumNetworks = len(nets)
 	})
@@ -98,41 +100,41 @@ var _ = PDescribe("HNS wrapper", func() {
 			expectNumberOfEndpoints(0)
 
 			Expect(testHnsNetID).To(Equal(""))
-			testHnsNetID = MockHNSNetwork(common.AdapterName(netAdapter), testNetName, subnetCIDR,
+			testHnsNetID = helpers.CreateTestHNSNetwork(common.AdapterName(netAdapter), testNetName, subnetCIDR,
 				defaultGW)
 			Expect(testHnsNetID).ToNot(Equal(""))
 
-			net, err := GetHNSNetwork(testHnsNetID)
+			net, err := hns.GetHNSNetwork(testHnsNetID)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(net).ToNot(BeNil())
 		})
 
 		AfterEach(func() {
-			endpoints, err := ListHNSEndpoints()
+			endpoints, err := hns.ListHNSEndpoints()
 			Expect(err).ToNot(HaveOccurred())
 			if len(endpoints) > 0 {
 				// Cleanup lingering endpoints.
 				for _, ep := range endpoints {
-					err = DeleteHNSEndpoint(ep.Id)
+					err = hns.DeleteHNSEndpoint(ep.Id)
 					Expect(err).ToNot(HaveOccurred())
 				}
 				expectNumberOfEndpoints(0)
 			}
 
 			Expect(testHnsNetID).ToNot(Equal(""))
-			err = DeleteHNSNetwork(testHnsNetID)
+			err = hns.DeleteHNSNetwork(testHnsNetID)
 			Expect(err).ToNot(HaveOccurred())
-			_, err = GetHNSNetwork(testHnsNetID)
+			_, err = hns.GetHNSNetwork(testHnsNetID)
 			Expect(err).To(HaveOccurred())
 			testHnsNetID = ""
-			nets, err := ListHNSNetworks()
+			nets, err := hns.ListHNSNetworks()
 			Expect(err).ToNot(HaveOccurred())
 			Expect(nets).ToNot(BeNil())
 			Expect(len(nets)).To(Equal(originalNumNetworks))
 		})
 
 		Specify("listing all HNS networks works", func() {
-			nets, err := ListHNSNetworks()
+			nets, err := hns.ListHNSNetworks()
 			Expect(err).ToNot(HaveOccurred())
 			Expect(nets).ToNot(BeNil())
 			Expect(len(nets)).To(Equal(originalNumNetworks + 1))
@@ -147,14 +149,14 @@ var _ = PDescribe("HNS wrapper", func() {
 		})
 
 		Specify("getting a single HNS network works", func() {
-			net, err := GetHNSNetwork(testHnsNetID)
+			net, err := hns.GetHNSNetwork(testHnsNetID)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(net).ToNot(BeNil())
 			Expect(net.Id).To(Equal(testHnsNetID))
 		})
 
 		Specify("getting a single HNS network by name works", func() {
-			net, err := GetHNSNetworkByName(testNetName)
+			net, err := hns.GetHNSNetworkByName(testNetName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(net).ToNot(BeNil())
 			Expect(net.Id).To(Equal(testHnsNetID))
@@ -166,11 +168,11 @@ var _ = PDescribe("HNS wrapper", func() {
 				Name:           "ep_name",
 			}
 
-			endpointID, err := CreateHNSEndpoint(hnsEndpointConfig)
+			endpointID, err := hns.CreateHNSEndpoint(hnsEndpointConfig)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(endpointID).ToNot(Equal(""))
 
-			endpoint, err := GetHNSEndpoint(endpointID)
+			endpoint, err := hns.GetHNSEndpoint(endpointID)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(endpoint).ToNot(BeNil())
 
@@ -178,10 +180,10 @@ var _ = PDescribe("HNS wrapper", func() {
 
 			log.Infoln(endpoint)
 
-			err = DeleteHNSEndpoint(endpointID)
+			err = hns.DeleteHNSEndpoint(endpointID)
 			Expect(err).ToNot(HaveOccurred())
 
-			endpoint, err = GetHNSEndpoint(endpointID)
+			endpoint, err = hns.GetHNSEndpoint(endpointID)
 			Expect(err).To(HaveOccurred())
 			Expect(endpoint).To(BeNil())
 		})
@@ -191,13 +193,13 @@ var _ = PDescribe("HNS wrapper", func() {
 				VirtualNetwork: testHnsNetID,
 			}
 
-			endpointsList, err := ListHNSEndpoints()
+			endpointsList, err := hns.ListHNSEndpoints()
 			Expect(err).ToNot(HaveOccurred())
 			numEndpointsOriginal := len(endpointsList)
 
 			var endpoints [2]string
 			for i := 0; i < 2; i++ {
-				endpoints[i], err = CreateHNSEndpoint(hnsEndpointConfig)
+				endpoints[i], err = hns.CreateHNSEndpoint(hnsEndpointConfig)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(endpoints[i]).ToNot(Equal(""))
 			}
@@ -205,7 +207,7 @@ var _ = PDescribe("HNS wrapper", func() {
 			expectNumberOfEndpoints(numEndpointsOriginal + 2)
 
 			for _, ep := range endpoints {
-				err = DeleteHNSEndpoint(ep)
+				err = hns.DeleteHNSEndpoint(ep)
 				Expect(err).ToNot(HaveOccurred())
 			}
 
@@ -219,11 +221,11 @@ var _ = PDescribe("HNS wrapper", func() {
 					VirtualNetwork: testHnsNetID,
 					Name:           name,
 				}
-				_, err := CreateHNSEndpoint(hnsEndpointConfig)
+				_, err := hns.CreateHNSEndpoint(hnsEndpointConfig)
 				Expect(err).ToNot(HaveOccurred())
 			}
 
-			ep, err := GetHNSEndpointByName("name2")
+			ep, err := hns.GetHNSEndpointByName("name2")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ep.Name).To(Equal("name2"))
 		})
@@ -231,12 +233,12 @@ var _ = PDescribe("HNS wrapper", func() {
 		Context("There's a second HNS network", func() {
 			secondHNSNetID := ""
 			BeforeEach(func() {
-				secondHNSNetID = MockHNSNetwork(common.AdapterName(netAdapter), "other_net_name",
+				secondHNSNetID = helpers.CreateTestHNSNetwork(common.AdapterName(netAdapter), "other_net_name",
 					subnetCIDR, defaultGW)
 
 			})
 			AfterEach(func() {
-				err := DeleteHNSNetwork(secondHNSNetID)
+				err := hns.DeleteHNSNetwork(secondHNSNetID)
 				Expect(err).ToNot(HaveOccurred())
 			})
 			Specify("Listing HNS endpoints of specific network works", func() {
@@ -252,18 +254,18 @@ var _ = PDescribe("HNS wrapper", func() {
 
 				// create 3 endpoints in each network
 				for i := 0; i < 3; i++ {
-					ep1, err := CreateHNSEndpoint(config1)
+					ep1, err := hns.CreateHNSEndpoint(config1)
 					Expect(err).ToNot(HaveOccurred())
 
 					epsInFirstNet = append(epsInFirstNet, ep1)
 
-					ep2, err := CreateHNSEndpoint(config2)
+					ep2, err := hns.CreateHNSEndpoint(config2)
 					Expect(err).ToNot(HaveOccurred())
 
 					epsInSecondNet = append(epsInSecondNet, ep2)
 				}
 
-				foundEpsOfFirstNet, err := ListHNSEndpointsOfNetwork(testHnsNetID)
+				foundEpsOfFirstNet, err := hns.ListHNSEndpointsOfNetwork(testHnsNetID)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(foundEpsOfFirstNet).To(HaveLen(3))
 				for _, ep := range foundEpsOfFirstNet {
@@ -271,7 +273,7 @@ var _ = PDescribe("HNS wrapper", func() {
 					Expect(epsInSecondNet).ToNot(ContainElement(ep.Id))
 				}
 
-				foundEpsOfSecondNet, err := ListHNSEndpointsOfNetwork(secondHNSNetID)
+				foundEpsOfSecondNet, err := hns.ListHNSEndpointsOfNetwork(secondHNSNetID)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(foundEpsOfSecondNet).To(HaveLen(3))
 				for _, ep := range foundEpsOfSecondNet {
@@ -282,7 +284,7 @@ var _ = PDescribe("HNS wrapper", func() {
 		})
 
 		Specify("Creating endpoint in same subnet works", func() {
-			_, err := CreateHNSEndpoint(&hcsshim.HNSEndpoint{
+			_, err := hns.CreateHNSEndpoint(&hcsshim.HNSEndpoint{
 				VirtualNetwork: testHnsNetID,
 				IPAddress:      net.ParseIP("10.0.0.4"),
 			})
@@ -291,7 +293,7 @@ var _ = PDescribe("HNS wrapper", func() {
 		})
 
 		Specify("Creating endpoint in different subnet fails", func() {
-			_, err := CreateHNSEndpoint(&hcsshim.HNSEndpoint{
+			_, err := hns.CreateHNSEndpoint(&hcsshim.HNSEndpoint{
 				VirtualNetwork: testHnsNetID,
 				IPAddress:      net.ParseIP("10.1.0.4"),
 			})
@@ -300,13 +302,13 @@ var _ = PDescribe("HNS wrapper", func() {
 		})
 
 		Specify("Creating two endpoints with same IP works in same subnet fails", func() {
-			_, err := CreateHNSEndpoint(&hcsshim.HNSEndpoint{
+			_, err := hns.CreateHNSEndpoint(&hcsshim.HNSEndpoint{
 				VirtualNetwork: testHnsNetID,
 				IPAddress:      net.ParseIP("10.0.0.4"),
 			})
 			Expect(err).ToNot(HaveOccurred())
 
-			_, err = CreateHNSEndpoint(&hcsshim.HNSEndpoint{
+			_, err = hns.CreateHNSEndpoint(&hcsshim.HNSEndpoint{
 				VirtualNetwork: testHnsNetID,
 				IPAddress:      net.ParseIP("10.0.0.4"),
 			})
@@ -321,7 +323,7 @@ var _ = PDescribe("HNS wrapper", func() {
 		}
 		DescribeTable("Creating an endpoint with specific MACs",
 			func(t MACTestCase) {
-				epID, err := CreateHNSEndpoint(&hcsshim.HNSEndpoint{
+				epID, err := hns.CreateHNSEndpoint(&hcsshim.HNSEndpoint{
 					VirtualNetwork: testHnsNetID,
 					MacAddress:     t.MAC,
 				})
@@ -330,7 +332,7 @@ var _ = PDescribe("HNS wrapper", func() {
 					expectNumberOfEndpoints(0)
 				} else {
 					Expect(err).ToNot(HaveOccurred())
-					ep, err := GetHNSEndpoint(epID)
+					ep, err := hns.GetHNSEndpoint(epID)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(ep.MacAddress).To(Equal(t.MAC))
 					expectNumberOfEndpoints(1)
@@ -356,7 +358,7 @@ var _ = PDescribe("HNS wrapper", func() {
 				MacAddress:     "11-22-33-44-55-66",
 			}
 			for i := 0; i < 3; i++ {
-				_, err := CreateHNSEndpoint(cfg)
+				_, err := hns.CreateHNSEndpoint(cfg)
 				Expect(err).ToNot(HaveOccurred())
 			}
 			expectNumberOfEndpoints(3)
@@ -367,7 +369,7 @@ var _ = PDescribe("HNS wrapper", func() {
 				VirtualNetwork: testHnsNetID,
 				Name:           "A:B123/123",
 			}
-			_, err := CreateHNSEndpoint(cfg)
+			_, err := hns.CreateHNSEndpoint(cfg)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -375,31 +377,31 @@ var _ = PDescribe("HNS wrapper", func() {
 	Context("HNS network doesn't exist", func() {
 
 		BeforeEach(func() {
-			nets, err := ListHNSNetworks()
+			nets, err := hns.ListHNSNetworks()
 			Expect(err).ToNot(HaveOccurred())
 			Expect(len(nets)).To(Equal(originalNumNetworks))
 		})
 
 		AfterEach(func() {
-			nets, err := ListHNSNetworks()
+			nets, err := hns.ListHNSNetworks()
 			Expect(err).ToNot(HaveOccurred())
 			for _, n := range nets {
 				if strings.Contains(n.Name, "nat") {
 					continue
 				}
-				err = DeleteHNSNetwork(n.Id)
+				err = hns.DeleteHNSNetwork(n.Id)
 				Expect(err).ToNot(HaveOccurred())
 			}
 		})
 
 		Specify("getting single HNS network returns error", func() {
-			net, err := GetHNSNetwork("1234abcd")
+			net, err := hns.GetHNSNetwork("1234abcd")
 			Expect(err).To(HaveOccurred())
 			Expect(net).To(BeNil())
 		})
 
 		Specify("getting single HNS network by name returns nil, nil", func() {
-			net, err := GetHNSNetworkByName("asdf")
+			net, err := hns.GetHNSNetworkByName("asdf")
 			Expect(err).To(BeNil())
 			Expect(net).To(BeNil())
 		})
@@ -421,7 +423,7 @@ var _ = PDescribe("HNS race conditions workarounds", func() {
 		targetAddr = fmt.Sprintf("%s:%v", controllerAddr, controllerPort)
 		err := common.HardResetHNS()
 		Expect(err).ToNot(HaveOccurred())
-		err = networking_acl.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
+		err = win_networking.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -455,7 +457,7 @@ var _ = PDescribe("HNS race conditions workarounds", func() {
 				name := fmt.Sprintf("net%v", i)
 				configuration.Name = name
 				By(fmt.Sprintf("Creating HNS network %s", name))
-				netID, err := CreateHNSNetwork(configuration)
+				netID, err := hns.CreateHNSNetwork(configuration)
 				Expect(err).ToNot(HaveOccurred(), name)
 				conn, err := net.Dial("tcp", targetAddr)
 				Expect(err).ToNot(HaveOccurred(), name)
@@ -464,7 +466,7 @@ var _ = PDescribe("HNS race conditions workarounds", func() {
 				}
 
 				By(fmt.Sprintf("Deleting HNS network %s", name))
-				err = DeleteHNSNetwork(netID)
+				err = hns.DeleteHNSNetwork(netID)
 				Expect(err).ToNot(HaveOccurred(), name)
 				conn, err = net.Dial("tcp", targetAddr)
 				Expect(err).ToNot(HaveOccurred(), name)
@@ -483,7 +485,7 @@ var _ = PDescribe("HNS race conditions workarounds", func() {
 				name := fmt.Sprintf("net%v", i)
 				configuration.Name = name
 				By(fmt.Sprintf("Creating HNS network %s", name))
-				netID, err := CreateHNSNetwork(configuration)
+				netID, err := hns.CreateHNSNetwork(configuration)
 				Expect(err).ToNot(HaveOccurred(), name)
 				netIDs = append(netIDs, netID)
 				conn, err := net.Dial("tcp", targetAddr)
@@ -496,7 +498,7 @@ var _ = PDescribe("HNS race conditions workarounds", func() {
 			for i, netID := range netIDs {
 				name := fmt.Sprintf("net%v", i)
 				By(fmt.Sprintf("Deleting HNS network %s", name))
-				err := DeleteHNSNetwork(netID)
+				err := hns.DeleteHNSNetwork(netID)
 				Expect(err).ToNot(HaveOccurred(), name)
 				conn, err := net.Dial("tcp", targetAddr)
 				Expect(err).ToNot(HaveOccurred(), name)
@@ -514,14 +516,14 @@ var _ = PDescribe("HNS race conditions workarounds", func() {
 		}
 
 		Specify("error does not occur when we don't supply a subnet to new network", func() {
-			// CreateHNSNetwork may fail with error:
+			// hns.CreateHNSNetwork may fail with error:
 			// `HNS failed with error : Unspecified error`
 			configuration.NetworkAdapterName = netAdapter
 			for i := 0; i < numTries; i++ {
 				name := fmt.Sprintf("net%v", i)
 				configuration.Name = name
 				By(fmt.Sprintf("Creating HNS network %s", name))
-				netID, err := CreateHNSNetwork(configuration)
+				netID, err := hns.CreateHNSNetwork(configuration)
 				Expect(err).ToNot(HaveOccurred(), name)
 				hcsshim.HNSNetworkRequest("DELETE", netID, "")
 			}
@@ -530,7 +532,7 @@ var _ = PDescribe("HNS race conditions workarounds", func() {
 })
 
 func expectNumberOfEndpoints(num int) {
-	eps, err := ListHNSEndpoints()
+	eps, err := hns.ListHNSEndpoints()
 	Expect(err).ToNot(HaveOccurred())
 	Expect(eps).To(HaveLen(num))
 }

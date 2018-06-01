@@ -13,14 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package networking_acl_test
+package win_networking_test
 
 import (
 	"errors"
 	"net"
 	"testing"
 
-	"github.com/Juniper/contrail-windows-docker-driver/networking_acl"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns/win_networking"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
@@ -54,7 +54,7 @@ var _ = Describe("GetValidIpv4Address", func() {
 			iface := &FakeInterface{
 				addrs: fakeAddrs,
 			}
-			ip, err := networking_acl.GetValidIpv4Address(iface)
+			ip, err := win_networking.GetValidIpv4Address(iface)
 			Expect(ip).To(Equal(expectedValue))
 			if shouldError {
 				Expect(err).To(HaveOccurred())
@@ -87,14 +87,14 @@ var _ = Describe("GetValidIpv4Address", func() {
 			// intentionally left empty
 			},
 		}
-		ip, err := networking_acl.GetValidIpv4Address(iface)
+		ip, err := win_networking.GetValidIpv4Address(iface)
 		Expect(ip).To(BeNil())
 		Expect(err).To(HaveOccurred())
 	})
 
 	It("returns nil and error if couldn't retreive addresses", func() {
 		iface := &FakeErroringInterface{}
-		ip, err := networking_acl.GetValidIpv4Address(iface)
+		ip, err := win_networking.GetValidIpv4Address(iface)
 		Expect(ip).To(BeNil())
 		Expect(err).To(HaveOccurred())
 	})

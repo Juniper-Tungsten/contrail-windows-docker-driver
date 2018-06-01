@@ -22,7 +22,7 @@ import (
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	"github.com/Juniper/contrail-windows-docker-driver/hns"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns"
 )
 
 // HNSManager manages HNS networks that are used by the driver.

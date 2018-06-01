@@ -30,8 +30,8 @@ import (
 	"context"
 
 	"github.com/Juniper/contrail-go-api/types"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	"github.com/Juniper/contrail-windows-docker-driver/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/hnsManager"
 	"github.com/Juniper/contrail-windows-docker-driver/hyperv"
 	"github.com/Microsoft/go-winio"
@@ -88,7 +88,7 @@ func (d *ContrailDriver) StartServing() error {
 		return errors.New("Already serving.")
 	}
 
-	if err := d.createRootNetwork(); err != nil {
+	if err := hns.Init(d.networkAdapter); err != nil {
 		return err
 	}
 
@@ -616,39 +616,6 @@ func (d *ContrailDriver) RevokeExternalConnectivity(
 	req *network.RevokeExternalConnectivityRequest) error {
 	log.Debugln("=== RevokeExternalConnectivity")
 	log.Debugln(req)
-	return nil
-}
-
-func (d *ContrailDriver) createRootNetwork() error {
-	// HNS automatically creates a new vswitch if the first HNS network is created. We want to
-	// control this behaviour. That's why we create a dummy root HNS network.
-
-	rootNetwork, err := hns.GetHNSNetworkByName(common.RootNetworkName)
-	if err != nil {
-		return err
-	}
-	if rootNetwork == nil {
-
-		subnets := []hcsshim.Subnet{
-			{
-				AddressPrefix: "0.0.0.0/24",
-			},
-		}
-		configuration := &hcsshim.HNSNetwork{
-			Name:               common.RootNetworkName,
-			Type:               "transparent",
-			NetworkAdapterName: string(d.networkAdapter),
-			Subnets:            subnets,
-		}
-		rootNetID, err := hns.CreateHNSNetwork(configuration)
-		if err != nil {
-			return err
-		}
-
-		log.Infoln("Created root HNS network:", rootNetID)
-	} else {
-		log.Infoln("Existing root HNS network found:", rootNetwork.Id)
-	}
 	return nil
 }
 

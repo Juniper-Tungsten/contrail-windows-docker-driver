@@ -13,14 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package networking_acl
+package win_networking
 
 import (
 	"errors"
 	"net"
 
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	"github.com/Juniper/contrail-windows-docker-driver/networking_acl/retry"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns/win_networking/retry"
 )
 
 type Interface interface {

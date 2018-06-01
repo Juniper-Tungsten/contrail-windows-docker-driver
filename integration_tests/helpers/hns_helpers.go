@@ -13,15 +13,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package hns
+package helpers
 
 import (
-	"github.com/Microsoft/hcsshim"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
+	"github.com/Microsoft/hcsshim"
 	. "github.com/onsi/gomega"
 )
 
-func MockHNSNetwork(netAdapter common.AdapterName, name, subnetCIDR, defaultGW string) string {
+func CreateTestHNSNetwork(netAdapter common.AdapterName, name, subnetCIDR, defaultGW string) string {
 	subnets := []hcsshim.Subnet{
 		{
 			AddressPrefix:  subnetCIDR,
@@ -35,16 +36,16 @@ func MockHNSNetwork(netAdapter common.AdapterName, name, subnetCIDR, defaultGW s
 		Subnets:            subnets,
 	}
 	var err error
-	netID, err := CreateHNSNetwork(netConfig)
+	netID, err := hns.CreateHNSNetwork(netConfig)
 	Expect(err).ToNot(HaveOccurred())
 	return netID
 }
 
-func MockHNSEndpoint(netID string) string {
+func CreateTestHNSEndpoint(netID string) string {
 	epConfig := &hcsshim.HNSEndpoint{
 		VirtualNetwork: netID,
 	}
-	epID, err := CreateHNSEndpoint(epConfig)
+	epID, err := hns.CreateHNSEndpoint(epConfig)
 	Expect(err).ToNot(HaveOccurred())
 	return epID
 }

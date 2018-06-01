@@ -31,10 +31,10 @@ import (
 	"github.com/Juniper/contrail-windows-docker-driver/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/driver"
-	"github.com/Juniper/contrail-windows-docker-driver/hns"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/hnsManager"
 	"github.com/Juniper/contrail-windows-docker-driver/hyperv"
-	"github.com/Juniper/contrail-windows-docker-driver/networking_acl"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns/win_networking"
 	"github.com/Microsoft/hcsshim"
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerTypesContainer "github.com/docker/docker/api/types/container"
@@ -97,7 +97,7 @@ func cleanupAll() {
 	Expect(err).ToNot(HaveOccurred())
 	err = common.HardResetHNS()
 	Expect(err).ToNot(HaveOccurred())
-	err = networking_acl.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
+	err = win_networking.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
 	Expect(err).ToNot(HaveOccurred())
 
 	docker := getDockerClient()
@@ -338,7 +338,7 @@ var _ = PDescribe("On requests from docker daemon", func() {
 		err = common.HardResetHNS()
 		Expect(err).ToNot(HaveOccurred())
 
-		err = networking_acl.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
+		err = win_networking.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -487,7 +487,7 @@ var _ = PDescribe("On requests from docker daemon", func() {
 		})
 
 		Context("Contrail network doesn't exist", func() {
-			// for example, somebody deleted Contrail network before removing docker/hns
+			// for example, somebody deleted Contrail network before removing docker/adapters/secondary/hns
 			BeforeEach(func() {
 				err := contrailController.DeleteElementRecursive(contrailNet)
 				Expect(err).ToNot(HaveOccurred())

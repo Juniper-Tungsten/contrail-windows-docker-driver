@@ -20,8 +20,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns/win_networking"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	"github.com/Juniper/contrail-windows-docker-driver/networking_acl"
 	"github.com/Microsoft/hcsshim"
 	log "github.com/sirupsen/logrus"
 )
@@ -32,6 +32,43 @@ type recoverableError struct {
 
 func (e *recoverableError) Error() string {
 	return e.inner.Error()
+}
+
+func Init(nameOfAdapterToUse common.AdapterName) error {
+	// HNS automatically creates a new vswitch if the first HNS network is created. We want to
+	// control this behaviour. That's why we create a dummy root HNS network.
+
+	if err := win_networking.WaitForValidIPReacquisition(nameOfAdapterToUse); err != nil {
+		return err
+	}
+
+	rootNetwork, err := GetHNSNetworkByName(common.RootNetworkName)
+	if err != nil {
+		return err
+	}
+	if rootNetwork == nil {
+
+		subnets := []hcsshim.Subnet{
+			{
+				AddressPrefix: "0.0.0.0/24",
+			},
+		}
+		configuration := &hcsshim.HNSNetwork{
+			Name:               common.RootNetworkName,
+			Type:               "transparent",
+			NetworkAdapterName: string(nameOfAdapterToUse),
+			Subnets:            subnets,
+		}
+		rootNetID, err := CreateHNSNetwork(configuration)
+		if err != nil {
+			return err
+		}
+
+		log.Infoln("Created root HNS network:", rootNetID)
+	} else {
+		log.Infoln("Existing root HNS network found:", rootNetwork.Id)
+	}
+	return nil
 }
 
 func tryCreateHNSNetwork(config string) (string, error) {
@@ -51,7 +88,7 @@ func tryCreateHNSNetwork(config string) (string, error) {
 	// specified network adapter. This adapter will temporarily lose network connectivity
 	// while it reacquires IPv4. We need to wait for it.
 	// https://github.com/Microsoft/hcsshim/issues/108
-	if err := networking_acl.WaitForValidIPReacquisition(common.HNSTransparentInterfaceName); err != nil {
+	if err := win_networking.WaitForValidIPReacquisition(common.HNSTransparentInterfaceName); err != nil {
 		log.Errorln(err)
 
 		deleteErr := DeleteHNSNetwork(response.Id)
@@ -135,7 +172,7 @@ func DeleteHNSNetwork(hnsID string) error {
 		// also deleted. During this period, the adapter will temporarily lose network
 		// connectivity while it reacquires IPv4. We need to wait for it.
 		// https://github.com/Microsoft/hcsshim/issues/95
-		if err := networking_acl.WaitForValidIPReacquisition(
+		if err := win_networking.WaitForValidIPReacquisition(
 			common.AdapterName(toDelete.NetworkAdapterName)); err != nil {
 			log.Errorln(err)
 			return err
