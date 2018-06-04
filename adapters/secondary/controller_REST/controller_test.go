@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package controller_test
+package controller_rest_test
 
 import (
 	"flag"
@@ -24,7 +24,7 @@ import (
 	"github.com/Juniper/contrail-go-api/types"
 	log "github.com/sirupsen/logrus"
 
-	. "github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller"
+	. "github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"

@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package controller_test
+package controller_rest_test
 
 import (
 	"fmt"
@@ -21,14 +21,14 @@ import (
 	contrail "github.com/Juniper/contrail-go-api"
 	"github.com/Juniper/contrail-go-api/config"
 	"github.com/Juniper/contrail-go-api/types"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	. "github.com/onsi/gomega"
 	log "github.com/sirupsen/logrus"
 )
 
-func NewTestClientAndProject(tenant string) (*controller.ControllerAdapter, *types.Project) {
-	c := controller.NewFakeControllerAdapter()
+func NewTestClientAndProject(tenant string) (*controller_rest.ControllerAdapter, *types.Project) {
+	c := controller_rest.NewFakeControllerAdapter()
 
 	project, err := c.NewProject(common.DomainName, tenant)
 	Expect(err).ToNot(HaveOccurred())
@@ -143,7 +143,7 @@ func CreateTestInstanceIP(c contrail.ApiClient, tenantName string,
 	return allocatedIP
 }
 
-func ForceDeleteProject(c *controller.ControllerAdapter, tenant string) {
+func ForceDeleteProject(c *controller_rest.ControllerAdapter, tenant string) {
 	projToDelete, _ := c.ApiClient.FindByName("project", fmt.Sprintf("%s:%s", common.DomainName,
 		tenant))
 	if projToDelete != nil {
@@ -151,7 +151,7 @@ func ForceDeleteProject(c *controller.ControllerAdapter, tenant string) {
 	}
 }
 
-func CleanupLingeringVM(c *controller.ControllerAdapter, containerID string) {
+func CleanupLingeringVM(c *controller_rest.ControllerAdapter, containerID string) {
 	instance, err := types.VirtualMachineByName(c.ApiClient, containerID)
 	if err == nil {
 		log.Debugln("Cleaning up lingering test vm", instance.GetUuid())

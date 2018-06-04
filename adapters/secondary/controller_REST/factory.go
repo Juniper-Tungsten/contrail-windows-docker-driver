@@ -13,11 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package controller
+package controller_rest
 
 import (
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller/api"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller/auth"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/api"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/auth"
 )
 
 func NewControllerWithKeystoneAdapter(keys *auth.KeystoneParams, ip string, port int) (*ControllerAdapter, error) {

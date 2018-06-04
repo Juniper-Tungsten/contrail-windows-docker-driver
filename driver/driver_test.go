@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/Juniper/contrail-go-api/types"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
 	"github.com/Juniper/contrail-windows-docker-driver/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/driver"
@@ -880,7 +880,7 @@ var _ = PDescribe("On requests from docker daemon", func() {
 func startDriver() (d *driver.ContrailDriver, c driver.Controller, h *hnsManager.HNSManager, p *types.Project) {
 	var err error
 
-	c = controller.NewFakeControllerAdapter()
+	c = controller_rest.NewFakeControllerAdapter()
 
 	p, err = c.NewProject(common.DomainName, tenantName)
 	Expect(err).ToNot(HaveOccurred())
