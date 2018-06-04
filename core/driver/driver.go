@@ -33,7 +33,6 @@ import (
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/hnsManager"
-	"github.com/Juniper/contrail-windows-docker-driver/hyperv"
 	"github.com/Microsoft/go-winio"
 	"github.com/Microsoft/hcsshim"
 	dockerTypes "github.com/docker/docker/api/types"
@@ -47,11 +46,11 @@ import (
 const hnsEndpointWaitingTime = 5
 
 type ContrailDriver struct {
+	vrouter            VRouter
 	controller         Controller
 	agent              Agent
 	hnsMgr             *hnsManager.HNSManager
 	networkAdapter     common.AdapterName
-	vswitchName        common.VSwitchName
 	listener           net.Listener
 	PipeAddr           string
 	stopReasonChan     chan error
@@ -65,15 +64,15 @@ type NetworkMeta struct {
 	subnetCIDR string
 }
 
-func NewDriver(adapter, vswitchName string, c Controller, agent Agent,
+func NewDriver(adapter string, vr VRouter, c Controller, agent Agent,
 	hnsMgr *hnsManager.HNSManager) *ContrailDriver {
 
 	d := &ContrailDriver{
+		vrouter:            vr,
 		controller:         c,
 		agent:              agent,
 		hnsMgr:             hnsMgr,
 		networkAdapter:     common.AdapterName(adapter),
-		vswitchName:        common.VSwitchName(vswitchName),
 		PipeAddr:           "//./pipe/" + common.DriverName,
 		stopReasonChan:     make(chan error, 1),
 		stoppedServingChan: make(chan interface{}, 1),
@@ -92,34 +91,9 @@ func (d *ContrailDriver) StartServing() error {
 		return err
 	}
 
-	running, err := hyperv.IsExtensionRunning(d.vswitchName)
+	err := d.vrouter.Initialize()
 	if err != nil {
 		return err
-	}
-
-	if !running {
-		return errors.New("Extension doesn't seem to be running. Maybe try reinstalling?")
-	}
-
-	enabled, err := hyperv.IsExtensionEnabled(d.vswitchName)
-	if err != nil {
-		return err
-	}
-
-	if !enabled {
-		if err := hyperv.EnableExtension(d.vswitchName); err != nil {
-			return err
-		}
-
-		running, err := hyperv.IsExtensionRunning(d.vswitchName)
-		if err != nil {
-			return err
-		}
-
-		if !running {
-			return errors.New("Extension stopped running after being enabled. " +
-				"Try stopping vRouter agent, docker and removing container networks.")
-		}
 	}
 
 	startedServingChan := make(chan interface{}, 1)

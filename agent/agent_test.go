@@ -4,7 +4,7 @@ import (
 	"net/url"
 
 	"github.com/Juniper/contrail-windows-docker-driver/agent"
-	"github.com/Juniper/contrail-windows-docker-driver/driver"
+	"github.com/Juniper/contrail-windows-docker-driver/core/driver"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

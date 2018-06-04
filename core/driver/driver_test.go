@@ -28,13 +28,14 @@ import (
 
 	"github.com/Juniper/contrail-go-api/types"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns/win_networking"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hyperv_extension"
 	"github.com/Juniper/contrail-windows-docker-driver/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	"github.com/Juniper/contrail-windows-docker-driver/driver"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns"
+	"github.com/Juniper/contrail-windows-docker-driver/core/driver"
+	"github.com/Juniper/contrail-windows-docker-driver/core/vrouter"
 	"github.com/Juniper/contrail-windows-docker-driver/hnsManager"
-	"github.com/Juniper/contrail-windows-docker-driver/hyperv"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns/win_networking"
 	"github.com/Microsoft/hcsshim"
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerTypesContainer "github.com/docker/docker/api/types/container"
@@ -112,6 +113,7 @@ func getDockerNetwork(docker *dockerClient.Client, dockerNetID string) (dockerTy
 	return docker.NetworkInspect(context.Background(), dockerNetID, inspectOptions)
 }
 
+var fakeVRouter driver.VRouter
 var contrailController driver.Controller
 var contrailDriver *driver.ContrailDriver
 var hnsMgr *hnsManager.HNSManager
@@ -130,10 +132,10 @@ type OneTimeListener struct {
 	Received chan (interface{})
 }
 
-var _ = PDescribe("Contrail Network Driver", func() {
+var _ = Describe("Contrail Network Driver", func() {
 
 	BeforeEach(func() {
-		contrailDriver, contrailController, hnsMgr, project = startDriver()
+		fakeVRouter, contrailDriver, contrailController, hnsMgr, project = newModulesUnderTest()
 	})
 	AfterEach(func() {
 		if contrailDriver.IsServing {
@@ -141,10 +143,10 @@ var _ = PDescribe("Contrail Network Driver", func() {
 			Expect(err).ToNot(HaveOccurred())
 		}
 
-		cleanupAll()
+		//cleanupAll()
 	})
 
-	It("can start and stop listening on a named pipe", func() {
+	PIt("can start and stop listening on a named pipe", func() {
 		err := contrailDriver.StartServing()
 		Expect(err).ToNot(HaveOccurred())
 
@@ -164,7 +166,7 @@ var _ = PDescribe("Contrail Network Driver", func() {
 		}
 	})
 
-	It("creates a spec file for duration of listening", func() {
+	PIt("creates a spec file for duration of listening", func() {
 		err := contrailDriver.StartServing()
 		Expect(err).ToNot(HaveOccurred())
 
@@ -178,7 +180,7 @@ var _ = PDescribe("Contrail Network Driver", func() {
 		Expect(os.IsNotExist(err)).To(BeTrue())
 	})
 
-	Specify("stopping pipe listener won't cause docker restart to fail", func() {
+	PSpecify("stopping pipe listener won't cause docker restart to fail", func() {
 		err := contrailDriver.StartServing()
 		Expect(err).ToNot(HaveOccurred())
 
@@ -198,7 +200,7 @@ var _ = PDescribe("Contrail Network Driver", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	Specify("creating vswitch for forwarding extension works", func() {
+	PSpecify("creating vswitch for forwarding extension works", func() {
 		err := contrailDriver.StartServing()
 		Expect(err).ToNot(HaveOccurred())
 
@@ -232,87 +234,6 @@ var _ = PDescribe("Contrail Network Driver", func() {
 		err = contrailDriver.StopServing()
 		Expect(err).ToNot(HaveOccurred())
 	})
-
-	It("enables the Extension", func() {
-		By("starting to serve enables the Extension")
-		err := contrailDriver.StartServing()
-		Expect(err).ToNot(HaveOccurred())
-
-		enabled, err := hyperv.IsExtensionEnabled(common.VSwitchName(vswitchName))
-		Expect(err).ToNot(HaveOccurred())
-		Expect(enabled).To(BeTrue())
-
-		err = contrailDriver.StopServing()
-		Expect(err).ToNot(HaveOccurred())
-
-		By("stopping to serve does not disable the Extension")
-		enabled, err = hyperv.IsExtensionEnabled(common.VSwitchName(vswitchName))
-		Expect(err).ToNot(HaveOccurred())
-		Expect(enabled).To(BeTrue())
-
-		By("starting to serve again doesn't break")
-		err = contrailDriver.StartServing()
-		Expect(err).ToNot(HaveOccurred())
-
-		enabled, err = hyperv.IsExtensionEnabled(common.VSwitchName(vswitchName))
-		Expect(err).ToNot(HaveOccurred())
-		Expect(enabled).To(BeTrue())
-
-		err = contrailDriver.StopServing()
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	It("reenables Extension if it was disabled", func() {
-		By("starting to serve so that root hns network is created")
-		err := contrailDriver.StartServing()
-		Expect(err).ToNot(HaveOccurred())
-
-		enabled, err := hyperv.IsExtensionEnabled(common.VSwitchName(vswitchName))
-		Expect(err).ToNot(HaveOccurred())
-		Expect(enabled).To(BeTrue())
-
-		err = contrailDriver.StopServing()
-		Expect(err).ToNot(HaveOccurred())
-
-		By("manually disabling the Extension")
-		err = hyperv.DisableExtension(common.VSwitchName(vswitchName))
-		Expect(err).ToNot(HaveOccurred())
-
-		By("starting to serve again should reenable the Extension")
-		err = contrailDriver.StartServing()
-		Expect(err).ToNot(HaveOccurred())
-
-		enabled, err = hyperv.IsExtensionEnabled(common.VSwitchName(vswitchName))
-		Expect(err).ToNot(HaveOccurred())
-		Expect(enabled).To(BeTrue())
-	})
-
-	It("doesn't change Running state of Extension", func() {
-		err := contrailDriver.StartServing()
-		Expect(err).ToNot(HaveOccurred())
-
-		running, err := hyperv.IsExtensionRunning(common.VSwitchName(vswitchName))
-		Expect(err).ToNot(HaveOccurred())
-		Expect(running).To(BeTrue())
-
-		err = contrailDriver.StopServing()
-		Expect(err).ToNot(HaveOccurred())
-
-		By("trying again doesn't break it")
-		err = contrailDriver.StartServing()
-		Expect(err).ToNot(HaveOccurred())
-
-		running, err = hyperv.IsExtensionRunning(common.VSwitchName(vswitchName))
-		Expect(err).ToNot(HaveOccurred())
-		Expect(running).To(BeTrue())
-
-		err = contrailDriver.StopServing()
-		Expect(err).ToNot(HaveOccurred())
-
-		running, err = hyperv.IsExtensionRunning(common.VSwitchName(vswitchName))
-		Expect(err).ToNot(HaveOccurred())
-		Expect(running).To(BeTrue())
-	})
 })
 
 var _ = PDescribe("On requests from docker daemon", func() {
@@ -320,7 +241,7 @@ var _ = PDescribe("On requests from docker daemon", func() {
 	var docker *dockerClient.Client
 
 	BeforeEach(func() {
-		contrailDriver, contrailController, hnsMgr, project = startDriver()
+		fakeVRouter, contrailDriver, contrailController, hnsMgr, project = newModulesUnderTest()
 
 		err := contrailDriver.StartServing()
 		Expect(err).ToNot(HaveOccurred())
@@ -877,8 +798,14 @@ var _ = PDescribe("On requests from docker daemon", func() {
 	})
 })
 
-func startDriver() (d *driver.ContrailDriver, c driver.Controller, h *hnsManager.HNSManager, p *types.Project) {
+func newModulesUnderTest() (vr driver.VRouter, d *driver.ContrailDriver, c driver.Controller, h *hnsManager.HNSManager, p *types.Project) {
 	var err error
+
+	ext := &hyperv_extension.HyperVExtensionSimulator{
+		Enabled: false,
+		Running: true,
+	}
+	vr = vrouter.NewHyperVvRouter(ext)
 
 	c = controller_rest.NewFakeControllerAdapter()
 
@@ -888,7 +815,7 @@ func startDriver() (d *driver.ContrailDriver, c driver.Controller, h *hnsManager
 	h = &hnsManager.HNSManager{}
 	serverUrl, _ := url.Parse("http://127.0.0.1:9091")
 	a := agent.NewAgentRestAPI(http.DefaultClient, serverUrl)
-	d = driver.NewDriver(netAdapter, vswitchName, c, a, h)
+	d = driver.NewDriver(netAdapter, vr, c, a, h)
 
 	return
 }

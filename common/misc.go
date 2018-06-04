@@ -24,7 +24,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type VSwitchName string
 type AdapterName string
 
 func HardResetHNS() error {

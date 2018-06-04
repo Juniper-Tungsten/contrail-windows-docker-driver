@@ -24,9 +24,11 @@ import (
 
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/auth"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hyperv_extension"
 	"github.com/Juniper/contrail-windows-docker-driver/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	"github.com/Juniper/contrail-windows-docker-driver/driver"
+	"github.com/Juniper/contrail-windows-docker-driver/core/driver"
+	"github.com/Juniper/contrail-windows-docker-driver/core/vrouter"
 	"github.com/Juniper/contrail-windows-docker-driver/hnsManager"
 	"github.com/Juniper/contrail-windows-docker-driver/logging"
 	log "github.com/sirupsen/logrus"
@@ -130,7 +132,10 @@ func (ws *WinService) Execute(args []string, winChangeReqChan <-chan svc.ChangeR
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
 	winStatusChan <- svc.Status{State: svc.StartPending}
 
-	c, err := controller_rest.NewControllerWithKeystoneAdapter(&ws.keys, ws.controllerIP, ws.controllerPort)
+	hypervExtension := hyperv_extension.NewHyperVvRouterForwardingExtension(ws.vswitchName)
+	vrouter := vrouter.NewHyperVvRouter(hypervExtension)
+
+	controller, err := controller_rest.NewControllerWithKeystoneAdapter(&ws.keys, ws.controllerIP, ws.controllerPort)
 	if err != nil {
 		log.Error(err)
 		return
@@ -142,8 +147,8 @@ func (ws *WinService) Execute(args []string, winChangeReqChan <-chan svc.ChangeR
 		return
 	}
 
-	a := agent.NewAgentRestAPI(http.DefaultClient, agentUrl)
-	d := driver.NewDriver(ws.adapter, ws.vswitchName, c, a, &hnsManager.HNSManager{})
+	agent := agent.NewAgentRestAPI(http.DefaultClient, agentUrl)
+	d := driver.NewDriver(ws.adapter, vrouter, controller, agent, &hnsManager.HNSManager{})
 	if err = d.StartServing(); err != nil {
 		log.Error(err)
 		return
