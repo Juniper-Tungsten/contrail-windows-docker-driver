@@ -54,7 +54,7 @@ type ContrailDriver struct {
 	vswitchName        common.VSwitchName
 	listener           net.Listener
 	PipeAddr           string
-	stopChan           chan interface{}
+	stopReasonChan     chan error
 	stoppedServingChan chan interface{}
 	IsServing          bool
 }
@@ -75,7 +75,7 @@ func NewDriver(adapter, vswitchName string, c Controller, agent Agent,
 		networkAdapter:     common.AdapterName(adapter),
 		vswitchName:        common.VSwitchName(vswitchName),
 		PipeAddr:           "//./pipe/" + common.DriverName,
-		stopChan:           make(chan interface{}, 1),
+		stopReasonChan:     make(chan error, 1),
 		stoppedServingChan: make(chan interface{}, 1),
 		IsServing:          false,
 	}
@@ -148,8 +148,23 @@ func (d *ContrailDriver) StartServing() error {
 			return
 		}
 
+		if err := d.waitForPipeToAppear(); err != nil {
+			failedChan <- errors.New(fmt.Sprintln("When waiting for pipe to appear:", err))
+			return
+		}
+
 		h := network.NewHandler(d)
-		go h.Serve(d.listener)
+		go func() {
+			err := h.Serve(d.listener)
+			if err != nil {
+				d.stopReasonChan <- errors.New(fmt.Sprintln("When serving:", err))
+			}
+		}()
+
+		if err := d.waitUntilPipeDialable(); err != nil {
+			failedChan <- errors.New(fmt.Sprintln("When waiting for pipe to be dialable:", err))
+			return
+		}
 
 		if err := os.MkdirAll(common.PluginSpecDir(), 0755); err != nil {
 			failedChan <- errors.New(fmt.Sprintln("When setting up plugin spec directory:", err))
@@ -162,15 +177,12 @@ func (d *ContrailDriver) StartServing() error {
 			return
 		}
 
-		if err := d.waitForPipeToStart(); err != nil {
-			failedChan <- errors.New(fmt.Sprintln("When waiting for pipe to start:", err))
-			return
-		}
-
 		d.IsServing = true
 		startedServingChan <- true
 
-		<-d.stopChan
+		if err := <-d.stopReasonChan; err != nil {
+			log.Errorln("Stopped serving because:", err)
+		}
 
 		log.Infoln("Closing npipe listener")
 		if err := d.listener.Close(); err != nil {
@@ -199,7 +211,7 @@ func (d *ContrailDriver) StartServing() error {
 
 func (d *ContrailDriver) StopServing() error {
 	if d.IsServing {
-		d.stopChan <- true
+		d.stopReasonChan <- nil
 		<-d.stoppedServingChan
 		log.Infoln("Stopped serving")
 	}
@@ -640,7 +652,7 @@ func (d *ContrailDriver) createRootNetwork() error {
 	return nil
 }
 
-func (d *ContrailDriver) waitForPipeToStart() error {
+func (d *ContrailDriver) waitForPipeToAppear() error {
 	return d.waitForPipe(true)
 }
 
@@ -666,12 +678,6 @@ func (d *ContrailDriver) waitForPipe(waitUntilExists bool) error {
 		}
 
 		time.Sleep(common.PipePollingRate)
-	}
-
-	time.Sleep(time.Second * 1)
-
-	if waitUntilExists {
-		return d.waitUntilPipeDialable()
 	}
 
 	return nil
