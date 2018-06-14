@@ -28,5 +28,5 @@ func Retry(innerFunc func() error, maxAttempts int, waitDuration time.Duration) 
 		}
 		time.Sleep(waitDuration)
 	}
-	return fmt.Errorf("Polling timed out:", err)
+	return fmt.Errorf("Polling timed out: %s", err)
 }
