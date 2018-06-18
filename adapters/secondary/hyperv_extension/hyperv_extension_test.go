@@ -1,6 +1,6 @@
-// +build unit
+// +build integration
 //
-// Copyright (c) 2018 Juniper Networks, Inc. All Rights Reserved.
+// Copyright (c) 2017 Juniper Networks, Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,19 +14,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package agent_test
+package hyperv_extension_test
 
 import (
-	. "github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/reporters"
-	. "github.com/onsi/gomega"
-
 	"testing"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
-func TestAgent(t *testing.T) {
+// Stub to enable code coverage collection (go cov totally ignores modules without tests)
+func TestHyperVExtension(t *testing.T) {
 	RegisterFailHandler(Fail)
-	junitReporter := reporters.NewJUnitReporter("agent_junit.xml")
-	RunSpecsWithDefaultAndCustomReporters(t, "Driver-Agent communication test suite",
-		[]Reporter{junitReporter})
+	RunSpecs(t, "HyperVExtension")
 }

@@ -4,6 +4,9 @@ build/*
 # test reports
 *.xml
 
+# Code coverage stuff
+*.html
+*.txt
 
 # Created by https://www.gitignore.io/api/go,visualstudiocode
 
