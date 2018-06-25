@@ -1,12 +1,12 @@
 {
-  "product": "Contrail docker driver",
+  "product": "Contrail Docker Driver",
   "company": "Juniper Networks",
   "license": "LICENSE_MSI.txt",
   "upgrade-code": "ca674931-876d-4dfb-bb67-136c585b6ffc",
   "files": {
     "guid": "ca8cbb44-2a0d-4f95-9375-dccabc92ffc1",
     "items": [
-      "../../../../bin/contrail-windows-docker.exe"
+      "build/contrail-windows-docker.exe"
     ]
   },
   "env": {
@@ -17,11 +17,11 @@
   "choco": {},
     "hooks": [
     {
-      "command": "sc.exe create ContrailDockerDriver binPath=\"[INSTALLDIR]\\contrail-windows-docker.exe\" type=share start=auto DisplayName=\"ContrailDockerDriver\"",
+      "command": "sc.exe create contrail-windows-docker binPath=\"[INSTALLDIR]\\contrail-windows-docker.exe\" type=share start=auto DisplayName=\"contrail-windows-docker\"",
       "when": "install"
     },
     {
-      "command": "sc.exe delete ContrailDockerDriver",
+      "command": "sc.exe delete contrail-windows-docker",
       "when": "uninstall"
     }
   ]
