@@ -13,24 +13,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package driver
+package hns
 
 import (
-	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Microsoft/hcsshim"
 )
 
-type LocalContrailNetworkRepository interface {
-	CreateNetwork(netAdapter common.AdapterName, tenantName, networkName,
-		subnetCIDR, defaultGW string) (*hcsshim.HNSNetwork, error)
-	GetNetwork(tenantName, networkName, subnetCIDR string) (*hcsshim.HNSNetwork,
-		error)
-	DeleteNetwork(tenantName, networkName, subnetCIDR string) error
-	ListNetworks() ([]hcsshim.HNSNetwork, error)
+type HNSEndpointRepository struct{}
+
+func (repo *HNSEndpointRepository) CreateEndpoint(configuration *hcsshim.HNSEndpoint) (string, error) {
+	return CreateHNSEndpoint(configuration)
 }
 
-type LocalContrailEndpointRepository interface {
-	CreateEndpoint(configuration *hcsshim.HNSEndpoint) (string, error)
-	GetEndpointByName(name string) (*hcsshim.HNSEndpoint, error)
-	DeleteEndpoint(endpointID string) error
+func (repo *HNSEndpointRepository) GetEndpointByName(name string) (*hcsshim.HNSEndpoint, error) {
+	return GetHNSEndpointByName(name)
+}
+
+func (repo *HNSEndpointRepository) DeleteEndpoint(endpointID string) error {
+	return DeleteHNSEndpoint(endpointID)
 }

@@ -812,10 +812,11 @@ func newModulesUnderTest() (vr driver.VRouter, d *driver.ContrailDriver, c drive
 	p, err = c.NewProject(common.DomainName, tenantName)
 	Expect(err).ToNot(HaveOccurred())
 
-	r := &netSim.InMemContrailNetworksRepository{}
+	netRepo := &netSim.InMemContrailNetworksRepository{}
+	epRepo := &netSim.InMemEndpointRepository{}
 	serverUrl, _ := url.Parse("http://127.0.0.1:9091")
 	a := agent.NewAgentRestAPI(http.DefaultClient, serverUrl)
-	d = driver.NewDriver(netAdapter, vr, c, a, r)
+	d = driver.NewDriver(netAdapter, vr, c, a, netRepo, epRepo)
 
 	return
 }

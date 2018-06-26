@@ -13,24 +13,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package driver
+package simulator
 
 import (
-	"github.com/Juniper/contrail-windows-docker-driver/common"
+	"errors"
+
 	"github.com/Microsoft/hcsshim"
 )
 
-type LocalContrailNetworkRepository interface {
-	CreateNetwork(netAdapter common.AdapterName, tenantName, networkName,
-		subnetCIDR, defaultGW string) (*hcsshim.HNSNetwork, error)
-	GetNetwork(tenantName, networkName, subnetCIDR string) (*hcsshim.HNSNetwork,
-		error)
-	DeleteNetwork(tenantName, networkName, subnetCIDR string) error
-	ListNetworks() ([]hcsshim.HNSNetwork, error)
+type InMemEndpointRepository struct{}
+
+func (repo *InMemEndpointRepository) CreateEndpoint(configuration *hcsshim.HNSEndpoint) (string, error) {
+	return "", errors.New("Not implemented yet")
 }
 
-type LocalContrailEndpointRepository interface {
-	CreateEndpoint(configuration *hcsshim.HNSEndpoint) (string, error)
-	GetEndpointByName(name string) (*hcsshim.HNSEndpoint, error)
-	DeleteEndpoint(endpointID string) error
+func (repo *InMemEndpointRepository) GetEndpointByName(name string) (*hcsshim.HNSEndpoint, error) {
+	return nil, errors.New("Not implemented yet")
+}
+
+func (repo *InMemEndpointRepository) DeleteEndpoint(endpointID string) error {
+	return errors.New("Not implemented yet")
 }
