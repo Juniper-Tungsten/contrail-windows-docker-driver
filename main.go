@@ -148,9 +148,16 @@ func (ws *WinService) Execute(args []string, winChangeReqChan <-chan svc.ChangeR
 	}
 
 	agent := agent.NewAgentRestAPI(http.DefaultClient, agentUrl)
-	netRepo := &hns.HNSContrailNetworksRepository{}
+
+	netRepo, err := hns.NewHNSContrailNetworksRepository(common.AdapterName(ws.adapter))
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
 	epRepo := &hns.HNSEndpointRepository{}
-	d := driver.NewDriver(ws.adapter, vrouter, controller, agent, netRepo, epRepo)
+
+	d := driver.NewDriver(vrouter, controller, agent, netRepo, epRepo)
 	if err = d.StartServing(); err != nil {
 		log.Error(err)
 		return

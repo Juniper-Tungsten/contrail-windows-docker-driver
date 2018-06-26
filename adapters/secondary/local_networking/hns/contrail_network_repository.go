@@ -30,13 +30,27 @@ import (
 // of HNS network with a Contrail subnet. Also, it keeps the driver stateless (relevant state is
 // held directly in HNS). An alternative would be to have a local DB (like SQLite) that stores
 // associations.
-type HNSContrailNetworksRepository struct{}
+type HNSContrailNetworksRepository struct {
+	// physDataplaneNetAdapter is the name of physical dataplane adapter that we should attach our
+	// Contrail networks to, e.g. Ethernet0. It is NOT the adapter created by HNS (e.g. "HNS
+	// Transparent").
+	physDataplaneNetAdapter common.AdapterName
+}
+
+func NewHNSContrailNetworksRepository(physDataplaneNetAdapter common.AdapterName) (*HNSContrailNetworksRepository, error) {
+	if err := InitRootHNSNetwork(physDataplaneNetAdapter); err != nil {
+		return nil, err
+	}
+	return &HNSContrailNetworksRepository{
+		physDataplaneNetAdapter: physDataplaneNetAdapter,
+	}, nil
+}
 
 func associationNameForHNSNetworkContrailSubnet(tenant, netName, subnetCIDR string) string {
 	return fmt.Sprintf("%s:%s:%s:%s", common.HNSNetworkPrefix, tenant, netName, subnetCIDR)
 }
 
-func (repo *HNSContrailNetworksRepository) CreateNetwork(netAdapter common.AdapterName, tenantName, networkName,
+func (repo *HNSContrailNetworksRepository) CreateNetwork(tenantName, networkName,
 	subnetCIDR, defaultGW string) (*hcsshim.HNSNetwork, error) {
 
 	hnsNetName := associationNameForHNSNetworkContrailSubnet(tenantName, networkName, subnetCIDR)
@@ -56,7 +70,7 @@ func (repo *HNSContrailNetworksRepository) CreateNetwork(netAdapter common.Adapt
 	configuration := &hcsshim.HNSNetwork{
 		Name:               hnsNetName,
 		Type:               "transparent",
-		NetworkAdapterName: string(netAdapter),
+		NetworkAdapterName: string(repo.physDataplaneNetAdapter),
 		Subnets:            subnets,
 	}
 

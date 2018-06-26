@@ -34,7 +34,7 @@ func (e *recoverableError) Error() string {
 	return e.inner.Error()
 }
 
-func Init(nameOfAdapterToUse common.AdapterName) error {
+func InitRootHNSNetwork(nameOfAdapterToUse common.AdapterName) error {
 	// HNS automatically creates a new vswitch if the first HNS network is created. We want to
 	// control this behaviour. That's why we create a dummy root HNS network.
 

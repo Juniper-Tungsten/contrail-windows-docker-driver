@@ -16,13 +16,12 @@
 package driver
 
 import (
-	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Microsoft/hcsshim"
 )
 
 type LocalContrailNetworkRepository interface {
-	CreateNetwork(netAdapter common.AdapterName, tenantName, networkName,
-		subnetCIDR, defaultGW string) (*hcsshim.HNSNetwork, error)
+	CreateNetwork(tenantName, networkName, subnetCIDR, defaultGW string) (*hcsshim.HNSNetwork,
+		error)
 	GetNetwork(tenantName, networkName, subnetCIDR string) (*hcsshim.HNSNetwork,
 		error)
 	DeleteNetwork(tenantName, networkName, subnetCIDR string) error
