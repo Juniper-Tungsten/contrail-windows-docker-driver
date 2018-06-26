@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns/win_networking"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns/win_networking"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Microsoft/hcsshim"
 	log "github.com/sirupsen/logrus"

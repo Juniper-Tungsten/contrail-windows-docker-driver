@@ -20,7 +20,7 @@ import (
 	"net"
 
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns/win_networking/retry"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns/win_networking/retry"
 )
 
 type Interface interface {

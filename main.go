@@ -25,11 +25,11 @@ import (
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/auth"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hyperv_extension"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/core/driver"
 	"github.com/Juniper/contrail-windows-docker-driver/core/vrouter"
-	"github.com/Juniper/contrail-windows-docker-driver/hnsManager"
 	"github.com/Juniper/contrail-windows-docker-driver/logging"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/svc"
@@ -148,7 +148,8 @@ func (ws *WinService) Execute(args []string, winChangeReqChan <-chan svc.ChangeR
 	}
 
 	agent := agent.NewAgentRestAPI(http.DefaultClient, agentUrl)
-	d := driver.NewDriver(ws.adapter, vrouter, controller, agent, &hnsManager.HNSManager{})
+	repo := &hns.HNSContrailNetworksRepository{}
+	d := driver.NewDriver(ws.adapter, vrouter, controller, agent, repo)
 	if err = d.StartServing(); err != nil {
 		log.Error(err)
 		return
