@@ -16,27 +16,60 @@
 package simulator
 
 import (
-	"errors"
-
 	// We should rely on some kind of domain objects in the future - not hcsshim structs
 	// everywhere.
+	"errors"
+	"fmt"
+
+	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Microsoft/hcsshim"
 )
 
-type InMemContrailNetworksRepository struct{}
+type InMemContrailNetworksRepository struct {
+	networks map[string]hcsshim.HNSNetwork
+}
+
+func NewInMemContrailNetworksRepository() *InMemContrailNetworksRepository {
+	return &InMemContrailNetworksRepository{
+		networks: make(map[string]hcsshim.HNSNetwork),
+	}
+}
 
 func (repo *InMemContrailNetworksRepository) CreateNetwork(tenantName, networkName, subnetCIDR, defaultGW string) (*hcsshim.HNSNetwork, error) {
-	return nil, errors.New("Not implemented yet")
+	// TODO: not sure wheter we actually need such complicated name generation in a
+	// simulated repository.
+	// TBH, existence of such code in actual repository implementation and a fake suggests
+	// that we're looking at some other object. Some kind of naming policy class maybe?
+	name := fmt.Sprintf("%s:%s:%s:%s", common.HNSNetworkPrefix, tenantName, networkName, subnetCIDR)
+
+	net := hcsshim.HNSNetwork{Name: name}
+	repo.networks[name] = net
+	return &net, nil
 }
 
 func (repo *InMemContrailNetworksRepository) GetNetwork(tenantName, networkName, subnetCIDR string) (*hcsshim.HNSNetwork, error) {
-	return nil, errors.New("Not implemented yet")
+	nameToLookFor := fmt.Sprintf("%s:%s:%s:%s", common.HNSNetworkPrefix, tenantName, networkName, subnetCIDR)
+	if net, exists := repo.networks[nameToLookFor]; exists {
+		return &net, nil
+	} else {
+		return nil, errors.New("network not found")
+	}
 }
 
 func (repo *InMemContrailNetworksRepository) DeleteNetwork(tenantName, networkName, subnetCIDR string) error {
-	return errors.New("Not implemented yet")
+	nameToLookFor := fmt.Sprintf("%s:%s:%s:%s", common.HNSNetworkPrefix, tenantName, networkName, subnetCIDR)
+	if _, exists := repo.networks[nameToLookFor]; exists {
+		delete(repo.networks, nameToLookFor)
+		return nil
+	} else {
+		return errors.New("network not found, so couldn't delete it")
+	}
 }
 
 func (repo *InMemContrailNetworksRepository) ListNetworks() ([]hcsshim.HNSNetwork, error) {
-	return nil, errors.New("Not implemented yet")
+	arr := make([]hcsshim.HNSNetwork, 0, len(repo.networks))
+	for _, net := range repo.networks {
+		arr = append(arr, net)
+	}
+	return arr, nil
 }
