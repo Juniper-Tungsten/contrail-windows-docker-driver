@@ -22,13 +22,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/primary/docker_libnetwork_plugin"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/auth"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hyperv_extension"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	"github.com/Juniper/contrail-windows-docker-driver/core/driver"
+	"github.com/Juniper/contrail-windows-docker-driver/core/driver_core"
 	"github.com/Juniper/contrail-windows-docker-driver/core/vrouter"
 	"github.com/Juniper/contrail-windows-docker-driver/logging"
 	log "github.com/sirupsen/logrus"
@@ -150,14 +151,16 @@ func (ws *WinService) Execute(args []string, winChangeReqChan <-chan svc.ChangeR
 	agent := agent.NewAgentRestAPI(http.DefaultClient, agentUrl)
 
 	netRepo, err := hns.NewHNSContrailNetworksRepository(common.AdapterName(ws.adapter))
+
+	epRepo := &hns.HNSEndpointRepository{}
+
+	core, err := driver_core.NewContrailDriverCore(vrouter, controller, agent, netRepo, epRepo)
 	if err != nil {
 		log.Error(err)
 		return
 	}
 
-	epRepo := &hns.HNSEndpointRepository{}
-
-	d := driver.NewDriver(vrouter, controller, agent, netRepo, epRepo)
+	d := docker_libnetwork_plugin.NewDockerPluginServer(core)
 	if err = d.StartServing(); err != nil {
 		log.Error(err)
 		return

@@ -16,7 +16,7 @@
 // Implemented according to
 // https://github.com/docker/libnetwork/blob/master/docs/remote.md
 
-package driver
+package docker_libnetwork_plugin
 
 import (
 	"errors"
@@ -29,9 +29,8 @@ import (
 
 	"context"
 
-	"github.com/Juniper/contrail-go-api/types"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	"github.com/Juniper/contrail-windows-docker-driver/core/ports"
+	"github.com/Juniper/contrail-windows-docker-driver/core/driver_core"
 	winio "github.com/Microsoft/go-winio"
 	"github.com/Microsoft/hcsshim"
 	dockerTypes "github.com/docker/docker/api/types"
@@ -44,17 +43,17 @@ import (
 
 const hnsEndpointWaitingTime = 5
 
-type ContrailDriver struct {
-	vrouter                    ports.VRouter
-	controller                 ports.Controller
-	agent                      ports.Agent
-	localContrailNetworksRepo  ports.LocalContrailNetworkRepository
-	localContrailEndpointsRepo ports.LocalContrailEndpointRepository
-	listener                   net.Listener
-	PipeAddr                   string
-	stopReasonChan             chan error
-	stoppedServingChan         chan interface{}
-	IsServing                  bool
+type DockerPluginServer struct {
+	// TODO: for now, Core field is public, because we need to access its fields, like controller.
+	// This should be made private when making the Controller port smaller.
+	Core *driver_core.ContrailDriverCore
+	// TODO: we need to keep the following fields for now, but the plan is to refactor them
+	// out (along with related pipe logic) to a separate primary adapter.
+	listener           net.Listener
+	PipeAddr           string
+	stopReasonChan     chan error
+	stoppedServingChan chan interface{}
+	IsServing          bool
 }
 
 type NetworkMeta struct {
@@ -63,33 +62,21 @@ type NetworkMeta struct {
 	subnetCIDR string
 }
 
-func NewDriver(vr ports.VRouter, c ports.Controller, agent ports.Agent,
-	networksRepo ports.LocalContrailNetworkRepository,
-	endpointsRepo ports.LocalContrailEndpointRepository) *ContrailDriver {
-
-	d := &ContrailDriver{
-		vrouter:    vr,
-		controller: c,
-		agent:      agent,
-		localContrailNetworksRepo:  networksRepo,
-		localContrailEndpointsRepo: endpointsRepo,
-		PipeAddr:                   "//./pipe/" + common.DriverName,
-		stopReasonChan:             make(chan error, 1),
-		stoppedServingChan:         make(chan interface{}, 1),
-		IsServing:                  false,
+func NewDockerPluginServer(core *driver_core.ContrailDriverCore) *DockerPluginServer {
+	d := &DockerPluginServer{
+		Core:               core,
+		PipeAddr:           "//./pipe/" + common.DriverName,
+		stopReasonChan:     make(chan error, 1),
+		stoppedServingChan: make(chan interface{}, 1),
+		IsServing:          false,
 	}
 	return d
 }
 
-func (d *ContrailDriver) StartServing() error {
+func (d *DockerPluginServer) StartServing() error {
 
 	if d.IsServing {
 		return errors.New("Already serving.")
-	}
-
-	err := d.vrouter.Initialize()
-	if err != nil {
-		return err
 	}
 
 	startedServingChan := make(chan interface{}, 1)
@@ -179,7 +166,7 @@ func (d *ContrailDriver) StartServing() error {
 	}
 }
 
-func (d *ContrailDriver) StopServing() error {
+func (d *DockerPluginServer) StopServing() error {
 	if d.IsServing {
 		d.stopReasonChan <- nil
 		<-d.stoppedServingChan
@@ -189,14 +176,14 @@ func (d *ContrailDriver) StopServing() error {
 	return nil
 }
 
-func (d *ContrailDriver) GetCapabilities() (*network.CapabilitiesResponse, error) {
+func (d *DockerPluginServer) GetCapabilities() (*network.CapabilitiesResponse, error) {
 	log.Debugln("=== GetCapabilities")
 	r := &network.CapabilitiesResponse{}
 	r.Scope = network.LocalScope
 	return r, nil
 }
 
-func (d *ContrailDriver) CreateNetwork(req *network.CreateNetworkRequest) error {
+func (d *DockerPluginServer) CreateNetwork(req *network.CreateNetworkRequest) error {
 	log.Debugln("=== CreateNetwork")
 	log.Debugln("network.NetworkID =", req.NetworkID)
 	log.Debugln(req)
@@ -239,35 +226,13 @@ func (d *ContrailDriver) CreateNetwork(req *network.CreateNetworkRequest) error 
 	}
 	ipPool := req.IPv4Data[0].Pool
 
-	// Check if network is already created in Contrail.
-	contrailNetwork, err := d.controller.GetNetwork(tenant.(string), netName.(string))
-	if err != nil {
-		return err
-	}
-	if contrailNetwork == nil {
-		return errors.New("Retrieved Contrail network is nil")
-	}
+	tenantName := tenant.(string)
+	networkName := netName.(string)
 
-	log.Infoln("Got Contrail network", contrailNetwork.GetDisplayName())
-
-	contrailIpam, err := d.controller.GetIpamSubnet(contrailNetwork, ipPool)
-	if err != nil {
-		return err
-	}
-	subnetCIDR := d.getContrailSubnetCIDR(contrailIpam)
-
-	contrailGateway := contrailIpam.DefaultGateway
-	if contrailGateway == "" {
-		return errors.New("Default GW is empty")
-	}
-
-	_, err = d.localContrailNetworksRepo.CreateNetwork(tenant.(string), netName.(string),
-		subnetCIDR, contrailGateway)
-
-	return err
+	return d.Core.CreateNetwork(tenantName, networkName, ipPool)
 }
 
-func (d *ContrailDriver) AllocateNetwork(req *network.AllocateNetworkRequest) (
+func (d *DockerPluginServer) AllocateNetwork(req *network.AllocateNetworkRequest) (
 	*network.AllocateNetworkResponse, error) {
 	log.Debugln("=== AllocateNetwork")
 	log.Debugln(req)
@@ -275,7 +240,7 @@ func (d *ContrailDriver) AllocateNetwork(req *network.AllocateNetworkRequest) (
 	return nil, errors.New("AllocateNetwork is not implemented")
 }
 
-func (d *ContrailDriver) DeleteNetwork(req *network.DeleteNetworkRequest) error {
+func (d *DockerPluginServer) DeleteNetwork(req *network.DeleteNetworkRequest) error {
 	log.Debugln("=== DeleteNetwork")
 	log.Debugln(req)
 
@@ -291,6 +256,15 @@ func (d *ContrailDriver) DeleteNetwork(req *network.DeleteNetworkRequest) error 
 		return err
 	}
 
+	// this piece of code goes through ALL docker and HNS networks, looking for
+	// ones that match (based on uniquely defining metadata - tenant, network and subnet CIDR).
+	// If it doesn't find a match for a HNS network (that is: HNS network exists, but corresponding
+	// docker network doesn't), it will remove it.
+	// POSSIBLE BUG: current implementation will remove the last encountered unmatched HNS net.
+	// * what if there are many unmatched HNS networks? Should we remove all of them?
+	// AFAIR we cannot use NetworkID from request from docker driver and retreive docker
+	// network metadata, because the network already doesn't exist in docker DB.
+	// TODO: refactor into a separate Docker-HNS sync mechanism.
 	var toRemove *NetworkMeta
 	toRemove = nil
 	for _, hnsMeta := range hnsNetsMeta {
@@ -311,17 +285,18 @@ func (d *ContrailDriver) DeleteNetwork(req *network.DeleteNetworkRequest) error 
 	if toRemove == nil {
 		return errors.New("During handling of DeleteNetwork, couldn't find net to remove")
 	}
-	return d.localContrailNetworksRepo.DeleteNetwork(toRemove.tenant, toRemove.network, toRemove.subnetCIDR)
+
+	return d.Core.DeleteNetwork(toRemove.tenant, toRemove.network, toRemove.subnetCIDR)
 }
 
-func (d *ContrailDriver) FreeNetwork(req *network.FreeNetworkRequest) error {
+func (d *DockerPluginServer) FreeNetwork(req *network.FreeNetworkRequest) error {
 	log.Debugln("=== FreeNetwork")
 	log.Debugln(req)
 	// This method is used in swarm, in remote plugins. We don't implement it.
 	return errors.New("FreeNetwork is not implemented")
 }
 
-func (d *ContrailDriver) CreateEndpoint(req *network.CreateEndpointRequest) (
+func (d *DockerPluginServer) CreateEndpoint(req *network.CreateEndpointRequest) (
 	*network.CreateEndpointResponse, error) {
 	log.Debugln("=== CreateEndpoint")
 	log.Debugln(req)
@@ -337,7 +312,7 @@ func (d *ContrailDriver) CreateEndpoint(req *network.CreateEndpointRequest) (
 		return nil, err
 	}
 
-	contrailNetwork, err := d.controller.GetNetwork(meta.tenant, meta.network)
+	contrailNetwork, err := d.Core.Controller.GetNetwork(meta.tenant, meta.network)
 	if err != nil {
 		return nil, err
 	}
@@ -345,7 +320,7 @@ func (d *ContrailDriver) CreateEndpoint(req *network.CreateEndpointRequest) (
 
 	// TODO JW-187.
 	// We need to retreive Container ID here and use it instead of EndpointID as
-	// argument to d.controller.GetOrCreateInstance().
+	// argument to GetOrCreateInstance().
 	// EndpointID is equiv to interface, but in Contrail, we have a "VirtualMachine" in
 	// data model.
 	// A single VM can be connected to two or more overlay networks, but when we use
@@ -354,24 +329,24 @@ func (d *ContrailDriver) CreateEndpoint(req *network.CreateEndpointRequest) (
 	// containerID := req.Options["vmname"]
 	containerID := req.EndpointID
 
-	contrailIpam, err := d.controller.GetIpamSubnet(contrailNetwork, meta.subnetCIDR)
+	contrailIpam, err := d.Core.Controller.GetIpamSubnet(contrailNetwork, meta.subnetCIDR)
 	if err != nil {
 		return nil, err
 	}
-	contrailSubnetCIDR := d.getContrailSubnetCIDR(contrailIpam)
+	contrailSubnetCIDR := d.Core.GetContrailSubnetCIDR(contrailIpam)
 
-	contrailVif, err := d.controller.GetOrCreateInterface(contrailNetwork, meta.tenant,
+	contrailVif, err := d.Core.Controller.GetOrCreateInterface(contrailNetwork, meta.tenant,
 		containerID)
 	if err != nil {
 		return nil, err
 	}
 
-	contrailVM, err := d.controller.GetOrCreateInstance(contrailVif, containerID)
+	contrailVM, err := d.Core.Controller.GetOrCreateInstance(contrailVif, containerID)
 	if err != nil {
 		return nil, err
 	}
 
-	contrailIP, err := d.controller.GetOrCreateInstanceIp(contrailNetwork, contrailVif, contrailIpam.SubnetUuid)
+	contrailIP, err := d.Core.Controller.GetOrCreateInstanceIp(contrailNetwork, contrailVif, contrailIpam.SubnetUuid)
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +359,7 @@ func (d *ContrailDriver) CreateEndpoint(req *network.CreateEndpointRequest) (
 		return nil, errors.New("Default GW is empty")
 	}
 
-	contrailMac, err := d.controller.GetInterfaceMac(contrailVif)
+	contrailMac, err := d.Core.Controller.GetInterfaceMac(contrailVif)
 	log.Infoln("Retrieved MAC:", contrailMac)
 	if err != nil {
 		return nil, err
@@ -393,7 +368,7 @@ func (d *ContrailDriver) CreateEndpoint(req *network.CreateEndpointRequest) (
 	// HNS needs MACs like 11-22-AA-BB-CC-DD
 	formattedMac := strings.Replace(strings.ToUpper(contrailMac), ":", "-", -1)
 
-	hnsNet, err := d.localContrailNetworksRepo.GetNetwork(meta.tenant, meta.network, contrailSubnetCIDR)
+	hnsNet, err := d.Core.LocalContrailNetworksRepo.GetNetwork(meta.tenant, meta.network, contrailSubnetCIDR)
 	if err != nil {
 		return nil, err
 	}
@@ -406,7 +381,7 @@ func (d *ContrailDriver) CreateEndpoint(req *network.CreateEndpointRequest) (
 		GatewayAddress:     contrailGateway,
 	}
 
-	hnsEndpointID, err := d.localContrailEndpointsRepo.CreateEndpoint(hnsEndpointConfig)
+	hnsEndpointID, err := d.Core.LocalContrailEndpointsRepo.CreateEndpoint(hnsEndpointConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -421,7 +396,7 @@ func (d *ContrailDriver) CreateEndpoint(req *network.CreateEndpointRequest) (
 		// to verify if endpoint setup is done.
 
 		time.Sleep(hnsEndpointWaitingTime * time.Second)
-		err := d.agent.AddPort(contrailVM.GetUuid(), contrailVif.GetUuid(), ifName, contrailMac, containerID,
+		err := d.Core.Agent.AddPort(contrailVM.GetUuid(), contrailVif.GetUuid(), ifName, contrailMac, containerID,
 			contrailIP.GetInstanceIpAddress(), contrailNetwork.GetUuid())
 		if err != nil {
 			log.Error(err.Error())
@@ -438,7 +413,7 @@ func (d *ContrailDriver) CreateEndpoint(req *network.CreateEndpointRequest) (
 	return r, nil
 }
 
-func (d *ContrailDriver) DeleteEndpoint(req *network.DeleteEndpointRequest) error {
+func (d *DockerPluginServer) DeleteEndpoint(req *network.DeleteEndpointRequest) error {
 	log.Debugln("=== DeleteEndpoint")
 	log.Debugln(req)
 
@@ -452,13 +427,13 @@ func (d *ContrailDriver) DeleteEndpoint(req *network.DeleteEndpointRequest) erro
 		return err
 	}
 
-	contrailNetwork, err := d.controller.GetNetwork(meta.tenant, meta.network)
+	contrailNetwork, err := d.Core.Controller.GetNetwork(meta.tenant, meta.network)
 	if err != nil {
 		return err
 	}
 	log.Infoln("Retrieved Contrail network:", contrailNetwork.GetUuid())
 
-	contrailVif, err := d.controller.GetExistingInterface(contrailNetwork, meta.tenant,
+	contrailVif, err := d.Core.Controller.GetExistingInterface(contrailNetwork, meta.tenant,
 		containerID)
 	if err != nil {
 		log.Warn("When handling DeleteEndpoint, interface wasn't found")
@@ -468,25 +443,25 @@ func (d *ContrailDriver) DeleteEndpoint(req *network.DeleteEndpointRequest) erro
 			// This sleep is added to ensure that DeletePort request is called after AddPort.
 			// Value of waiting time has to be equal or greater than the one in 'CreateEndpoint'.
 			time.Sleep(hnsEndpointWaitingTime * time.Second)
-			err := d.agent.DeletePort(contrailVif.GetUuid())
+			err := d.Core.Agent.DeletePort(contrailVif.GetUuid())
 			if err != nil {
 				log.Error(err.Error())
 			}
 		}()
 	}
 
-	contrailInstance, err := d.controller.GetInstance(containerID)
+	contrailInstance, err := d.Core.Controller.GetInstance(containerID)
 	if err != nil {
 		log.Warn("When handling DeleteEndpoint, Contrail vm instance wasn't found")
 	} else {
-		err = d.controller.DeleteElementRecursive(contrailInstance)
+		err = d.Core.Controller.DeleteElementRecursive(contrailInstance)
 		if err != nil {
 			log.Warn("When handling DeleteEndpoint, failed to remove Contrail vm instance")
 		}
 	}
 
 	hnsEpName := req.EndpointID
-	epToDelete, err := d.localContrailEndpointsRepo.GetEndpointByName(hnsEpName)
+	epToDelete, err := d.Core.LocalContrailEndpointsRepo.GetEndpointByName(hnsEpName)
 	if err != nil {
 		return err
 	}
@@ -495,15 +470,15 @@ func (d *ContrailDriver) DeleteEndpoint(req *network.DeleteEndpointRequest) erro
 		return nil
 	}
 
-	return d.localContrailEndpointsRepo.DeleteEndpoint(epToDelete.Id)
+	return d.Core.LocalContrailEndpointsRepo.DeleteEndpoint(epToDelete.Id)
 }
 
-func (d *ContrailDriver) EndpointInfo(req *network.InfoRequest) (*network.InfoResponse, error) {
+func (d *DockerPluginServer) EndpointInfo(req *network.InfoRequest) (*network.InfoResponse, error) {
 	log.Debugln("=== EndpointInfo")
 	log.Debugln(req)
 
 	hnsEpName := req.EndpointID
-	hnsEp, err := d.localContrailEndpointsRepo.GetEndpointByName(hnsEpName)
+	hnsEp, err := d.Core.LocalContrailEndpointsRepo.GetEndpointByName(hnsEpName)
 	if err != nil {
 		return nil, err
 	}
@@ -522,7 +497,7 @@ func (d *ContrailDriver) EndpointInfo(req *network.InfoRequest) (*network.InfoRe
 	return r, nil
 }
 
-func (d *ContrailDriver) Join(req *network.JoinRequest) (*network.JoinResponse, error) {
+func (d *DockerPluginServer) Join(req *network.JoinRequest) (*network.JoinResponse, error) {
 	log.Debugln("=== Join")
 	log.Debugln(req)
 	log.Debugln("options:")
@@ -530,7 +505,7 @@ func (d *ContrailDriver) Join(req *network.JoinRequest) (*network.JoinResponse, 
 		fmt.Printf("%v: %v\n", k, v)
 	}
 
-	hnsEp, err := d.localContrailEndpointsRepo.GetEndpointByName(req.EndpointID)
+	hnsEp, err := d.Core.LocalContrailEndpointsRepo.GetEndpointByName(req.EndpointID)
 	if err != nil {
 		return nil, err
 	}
@@ -546,11 +521,11 @@ func (d *ContrailDriver) Join(req *network.JoinRequest) (*network.JoinResponse, 
 	return r, nil
 }
 
-func (d *ContrailDriver) Leave(req *network.LeaveRequest) error {
+func (d *DockerPluginServer) Leave(req *network.LeaveRequest) error {
 	log.Debugln("=== Leave")
 	log.Debugln(req)
 
-	hnsEp, err := d.localContrailEndpointsRepo.GetEndpointByName(req.EndpointID)
+	hnsEp, err := d.Core.LocalContrailEndpointsRepo.GetEndpointByName(req.EndpointID)
 	if err != nil {
 		return err
 	}
@@ -561,43 +536,43 @@ func (d *ContrailDriver) Leave(req *network.LeaveRequest) error {
 	return nil
 }
 
-func (d *ContrailDriver) DiscoverNew(req *network.DiscoveryNotification) error {
+func (d *DockerPluginServer) DiscoverNew(req *network.DiscoveryNotification) error {
 	log.Debugln("=== DiscoverNew")
 	log.Debugln(req)
 	// We don't care about discovery notifications.
 	return nil
 }
 
-func (d *ContrailDriver) DiscoverDelete(req *network.DiscoveryNotification) error {
+func (d *DockerPluginServer) DiscoverDelete(req *network.DiscoveryNotification) error {
 	log.Debugln("=== DiscoverDelete")
 	log.Debugln(req)
 	// We don't care about discovery notifications.
 	return nil
 }
 
-func (d *ContrailDriver) ProgramExternalConnectivity(
+func (d *DockerPluginServer) ProgramExternalConnectivity(
 	req *network.ProgramExternalConnectivityRequest) error {
 	log.Debugln("=== ProgramExternalConnectivity")
 	log.Debugln(req)
 	return nil
 }
 
-func (d *ContrailDriver) RevokeExternalConnectivity(
+func (d *DockerPluginServer) RevokeExternalConnectivity(
 	req *network.RevokeExternalConnectivityRequest) error {
 	log.Debugln("=== RevokeExternalConnectivity")
 	log.Debugln(req)
 	return nil
 }
 
-func (d *ContrailDriver) waitForPipeToAppear() error {
+func (d *DockerPluginServer) waitForPipeToAppear() error {
 	return d.waitForPipe(true)
 }
 
-func (d *ContrailDriver) waitForPipeToStop() error {
+func (d *DockerPluginServer) waitForPipeToStop() error {
 	return d.waitForPipe(false)
 }
 
-func (d *ContrailDriver) waitForPipe(waitUntilExists bool) error {
+func (d *DockerPluginServer) waitForPipe(waitUntilExists bool) error {
 	timeStarted := time.Now()
 	for {
 		if time.Since(timeStarted) > common.PipePollingTimeout {
@@ -620,7 +595,7 @@ func (d *ContrailDriver) waitForPipe(waitUntilExists bool) error {
 	return nil
 }
 
-func (d *ContrailDriver) waitUntilPipeDialable() error {
+func (d *DockerPluginServer) waitUntilPipeDialable() error {
 	timeStarted := time.Now()
 	for {
 		if time.Since(timeStarted) > common.PipePollingTimeout {
@@ -640,7 +615,7 @@ func (d *ContrailDriver) waitUntilPipeDialable() error {
 	}
 }
 
-func (d *ContrailDriver) networkMetaFromDockerNetwork(dockerNetID string) (*NetworkMeta,
+func (d *DockerPluginServer) networkMetaFromDockerNetwork(dockerNetID string) (*NetworkMeta,
 	error) {
 	docker, err := dockerClient.NewEnvClient()
 	if err != nil {
@@ -678,7 +653,7 @@ func (d *ContrailDriver) networkMetaFromDockerNetwork(dockerNetID string) (*Netw
 	return &meta, nil
 }
 
-func (d *ContrailDriver) dockerNetworksMeta() ([]NetworkMeta, error) {
+func (d *DockerPluginServer) dockerNetworksMeta() ([]NetworkMeta, error) {
 	var meta []NetworkMeta
 
 	docker, err := dockerClient.NewEnvClient()
@@ -705,8 +680,8 @@ func (d *ContrailDriver) dockerNetworksMeta() ([]NetworkMeta, error) {
 	return meta, nil
 }
 
-func (d *ContrailDriver) hnsNetworksMeta() ([]NetworkMeta, error) {
-	hnsNetworks, err := d.localContrailNetworksRepo.ListNetworks()
+func (d *DockerPluginServer) hnsNetworksMeta() ([]NetworkMeta, error) {
+	hnsNetworks, err := d.Core.LocalContrailNetworksRepo.ListNetworks()
 	if err != nil {
 		return nil, err
 	}
@@ -727,7 +702,7 @@ func (d *ContrailDriver) hnsNetworksMeta() ([]NetworkMeta, error) {
 	return meta, nil
 }
 
-func (d *ContrailDriver) generateFriendlyName(hnsEndpointID string) string {
+func (d *DockerPluginServer) generateFriendlyName(hnsEndpointID string) string {
 	// Here's how the Forwarding Extension (kernel) can identify interfaces based on their
 	// friendly names.
 	// Windows Containers have NIC names like "NIC ID abcdef", where abcdef are the first 6 chars
@@ -741,8 +716,4 @@ func (d *ContrailDriver) generateFriendlyName(hnsEndpointID string) string {
 	// has enough information to recognize it in kernel (6 first chars of UUID should be enough):
 	containerNicID := strings.Split(hnsEndpointID, "-")[0]
 	return fmt.Sprintf("Container NIC %s", containerNicID)
-}
-
-func (d *ContrailDriver) getContrailSubnetCIDR(ipam *types.IpamSubnetType) string {
-	return fmt.Sprintf("%s/%v", ipam.Subnet.IpPrefix, ipam.Subnet.IpPrefixLen)
 }
