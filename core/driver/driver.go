@@ -30,7 +30,6 @@ import (
 	"context"
 
 	"github.com/Juniper/contrail-go-api/types"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	winio "github.com/Microsoft/go-winio"
 	"github.com/Microsoft/hcsshim"
@@ -50,7 +49,6 @@ type ContrailDriver struct {
 	agent                      Agent
 	localContrailNetworksRepo  LocalContrailNetworkRepository
 	localContrailEndpointsRepo LocalContrailEndpointRepository
-	networkAdapter             common.AdapterName
 	listener                   net.Listener
 	PipeAddr                   string
 	stopReasonChan             chan error
@@ -64,8 +62,8 @@ type NetworkMeta struct {
 	subnetCIDR string
 }
 
-func NewDriver(adapter string, vr VRouter, c Controller, agent Agent,
-	networksRepo LocalContrailNetworkRepository, endpointsRepo LocalContrailEndpointRepository) *ContrailDriver {
+func NewDriver(vr VRouter, c Controller, agent Agent, networksRepo LocalContrailNetworkRepository,
+	endpointsRepo LocalContrailEndpointRepository) *ContrailDriver {
 
 	d := &ContrailDriver{
 		vrouter:    vr,
@@ -73,7 +71,6 @@ func NewDriver(adapter string, vr VRouter, c Controller, agent Agent,
 		agent:      agent,
 		localContrailNetworksRepo:  networksRepo,
 		localContrailEndpointsRepo: endpointsRepo,
-		networkAdapter:             common.AdapterName(adapter),
 		PipeAddr:                   "//./pipe/" + common.DriverName,
 		stopReasonChan:             make(chan error, 1),
 		stoppedServingChan:         make(chan interface{}, 1),
@@ -86,10 +83,6 @@ func (d *ContrailDriver) StartServing() error {
 
 	if d.IsServing {
 		return errors.New("Already serving.")
-	}
-
-	if err := hns.Init(d.networkAdapter); err != nil {
-		return err
 	}
 
 	err := d.vrouter.Initialize()
@@ -266,7 +259,7 @@ func (d *ContrailDriver) CreateNetwork(req *network.CreateNetworkRequest) error 
 		return errors.New("Default GW is empty")
 	}
 
-	_, err = d.localContrailNetworksRepo.CreateNetwork(d.networkAdapter, tenant.(string), netName.(string),
+	_, err = d.localContrailNetworksRepo.CreateNetwork(tenant.(string), netName.(string),
 		subnetCIDR, contrailGateway)
 
 	return err

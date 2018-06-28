@@ -18,7 +18,6 @@ package simulator
 import (
 	"errors"
 
-	"github.com/Juniper/contrail-windows-docker-driver/common"
 	// We should rely on some kind of domain objects in the future - not hcsshim structs
 	// everywhere.
 	"github.com/Microsoft/hcsshim"
@@ -26,9 +25,10 @@ import (
 
 type InMemContrailNetworksRepository struct{}
 
-func (repo *InMemContrailNetworksRepository) CreateNetwork(netAdapter common.AdapterName, tenantName, networkName, subnetCIDR, defaultGW string) (*hcsshim.HNSNetwork, error) {
+func (repo *InMemContrailNetworksRepository) CreateNetwork(tenantName, networkName, subnetCIDR, defaultGW string) (*hcsshim.HNSNetwork, error) {
 	return nil, errors.New("Not implemented yet")
 }
+
 func (repo *InMemContrailNetworksRepository) GetNetwork(tenantName, networkName, subnetCIDR string) (*hcsshim.HNSNetwork, error) {
 	return nil, errors.New("Not implemented yet")
 }

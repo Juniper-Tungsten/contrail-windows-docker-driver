@@ -105,8 +105,7 @@ var _ = PDescribe("HNSContrailNetworksRepository", func() {
 
 	Context("specified network does not exist", func() {
 		Specify("creating a new HNS network works", func() {
-			_, err := hnsContrailRepo.CreateNetwork(common.AdapterName(netAdapter), tenantName, networkName,
-				subnetCIDR, defaultGW)
+			_, err := hnsContrailRepo.CreateNetwork(tenantName, networkName, subnetCIDR, defaultGW)
 			Expect(err).ToNot(HaveOccurred())
 		})
 		Specify("getting the HNS network returns error", func() {
@@ -120,12 +119,12 @@ var _ = PDescribe("HNSContrailNetworksRepository", func() {
 		var existingNetID string
 		BeforeEach(func() {
 			hnsNetName := fmt.Sprintf("Contrail:%s:%s:%s", tenantName, networkName, subnetCIDR)
-			existingNetID = helpers.CreateTestHNSNetwork(common.AdapterName(netAdapter), hnsNetName,
-				subnetCIDR, defaultGW)
+			existingNetID = helpers.CreateTestHNSNetwork(common.AdapterName(netAdapter),
+				hnsNetName, subnetCIDR, defaultGW)
 		})
 
 		Specify("creating a new network with same params returns error", func() {
-			net, err := hnsContrailRepo.CreateNetwork(common.AdapterName(netAdapter), tenantName,
+			net, err := hnsContrailRepo.CreateNetwork(tenantName,
 				networkName, subnetCIDR, defaultGW)
 			Expect(err).To(HaveOccurred())
 			Expect(net).To(BeNil())
