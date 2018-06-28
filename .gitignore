@@ -1,6 +1,9 @@
-# Custom build script
-build.ps1
+# build output dir
+build/*
+
+# test reports
 *.xml
+
 
 # Created by https://www.gitignore.io/api/go,visualstudiocode
 
