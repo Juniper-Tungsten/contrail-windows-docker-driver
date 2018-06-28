@@ -19,7 +19,7 @@ import (
 	"net/url"
 
 	"github.com/Juniper/contrail-windows-docker-driver/agent"
-	"github.com/Juniper/contrail-windows-docker-driver/core/driver"
+	"github.com/Juniper/contrail-windows-docker-driver/core/ports"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -56,7 +56,7 @@ func (h *httpHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 var _ = Describe("AgentRestApi", func() {
 	mockHandler := &httpHandler{}
 	var testServer *httptest.Server
-	var agentInstance driver.Agent
+	var agentInstance ports.Agent
 
 	const (
 		vmUUID    = "vmUUID"

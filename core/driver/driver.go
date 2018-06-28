@@ -31,6 +31,7 @@ import (
 
 	"github.com/Juniper/contrail-go-api/types"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
+	"github.com/Juniper/contrail-windows-docker-driver/core/ports"
 	winio "github.com/Microsoft/go-winio"
 	"github.com/Microsoft/hcsshim"
 	dockerTypes "github.com/docker/docker/api/types"
@@ -44,11 +45,11 @@ import (
 const hnsEndpointWaitingTime = 5
 
 type ContrailDriver struct {
-	vrouter                    VRouter
-	controller                 Controller
-	agent                      Agent
-	localContrailNetworksRepo  LocalContrailNetworkRepository
-	localContrailEndpointsRepo LocalContrailEndpointRepository
+	vrouter                    ports.VRouter
+	controller                 ports.Controller
+	agent                      ports.Agent
+	localContrailNetworksRepo  ports.LocalContrailNetworkRepository
+	localContrailEndpointsRepo ports.LocalContrailEndpointRepository
 	listener                   net.Listener
 	PipeAddr                   string
 	stopReasonChan             chan error
@@ -62,8 +63,9 @@ type NetworkMeta struct {
 	subnetCIDR string
 }
 
-func NewDriver(vr VRouter, c Controller, agent Agent, networksRepo LocalContrailNetworkRepository,
-	endpointsRepo LocalContrailEndpointRepository) *ContrailDriver {
+func NewDriver(vr ports.VRouter, c ports.Controller, agent ports.Agent,
+	networksRepo ports.LocalContrailNetworkRepository,
+	endpointsRepo ports.LocalContrailEndpointRepository) *ContrailDriver {
 
 	d := &ContrailDriver{
 		vrouter:    vr,

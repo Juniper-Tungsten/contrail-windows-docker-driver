@@ -13,12 +13,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package driver
+package ports
 
 import (
+	"github.com/Microsoft/hcsshim"
+
 	contrail "github.com/Juniper/contrail-go-api"
 	"github.com/Juniper/contrail-go-api/types"
 )
+
+type Agent interface {
+	AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAddress, vnUUID string) error
+	DeletePort(vifUUID string) error
+}
+
+type VRouter interface {
+	Initialize() error
+}
+
+type LocalContrailNetworkRepository interface {
+	CreateNetwork(tenantName, networkName, subnetCIDR, defaultGW string) (*hcsshim.HNSNetwork,
+		error)
+	GetNetwork(tenantName, networkName, subnetCIDR string) (*hcsshim.HNSNetwork,
+		error)
+	DeleteNetwork(tenantName, networkName, subnetCIDR string) error
+	ListNetworks() ([]hcsshim.HNSNetwork, error)
+}
+
+type LocalContrailEndpointRepository interface {
+	CreateEndpoint(configuration *hcsshim.HNSEndpoint) (string, error)
+	GetEndpointByName(name string) (*hcsshim.HNSEndpoint, error)
+	DeleteEndpoint(endpointID string) error
+}
 
 // TODO: This interface can be simplified
 type Controller interface {
@@ -36,8 +62,8 @@ type Controller interface {
 	GetOrCreateInterface(net *types.VirtualNetwork, tenantName, containerId string) (*types.VirtualMachineInterface, error)
 	GetInterfaceMac(iface *types.VirtualMachineInterface) (string, error)
 
-	GetOrCreateInstanceIp(net *types.VirtualNetwork,
-		iface *types.VirtualMachineInterface, subnetUuid string) (*types.InstanceIp, error)
+	GetOrCreateInstanceIp(net *types.VirtualNetwork, iface *types.VirtualMachineInterface,
+		subnetUuid string) (*types.InstanceIp, error)
 
 	DeleteElementRecursive(parent contrail.IObject) error
 }

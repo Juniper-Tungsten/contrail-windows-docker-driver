@@ -35,6 +35,7 @@ import (
 	"github.com/Juniper/contrail-windows-docker-driver/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/core/driver"
+	"github.com/Juniper/contrail-windows-docker-driver/core/ports"
 	"github.com/Juniper/contrail-windows-docker-driver/core/vrouter"
 	"github.com/Microsoft/hcsshim"
 	dockerTypes "github.com/docker/docker/api/types"
@@ -113,10 +114,10 @@ func getDockerNetwork(docker *dockerClient.Client, dockerNetID string) (dockerTy
 	return docker.NetworkInspect(context.Background(), dockerNetID, inspectOptions)
 }
 
-var fakeVRouter driver.VRouter
-var contrailController driver.Controller
+var fakeVRouter ports.VRouter
+var contrailController ports.Controller
 var contrailDriver *driver.ContrailDriver
-var localContrailNetworksRepo driver.LocalContrailNetworkRepository
+var localContrailNetworksRepo ports.LocalContrailNetworkRepository
 var project *types.Project
 
 const (
@@ -798,7 +799,7 @@ var _ = PDescribe("On requests from docker daemon", func() {
 	})
 })
 
-func newModulesUnderTest() (vr driver.VRouter, d *driver.ContrailDriver, c driver.Controller, h driver.LocalContrailNetworkRepository, p *types.Project) {
+func newModulesUnderTest() (vr ports.VRouter, d *driver.ContrailDriver, c ports.Controller, h ports.LocalContrailNetworkRepository, p *types.Project) {
 	var err error
 
 	ext := &hyperv_extension.HyperVExtensionSimulator{
@@ -913,7 +914,7 @@ func cleanupAllDockerNetworksAndContainers(docker *dockerClient.Client) {
 	}
 }
 
-func createTestContrailNetwork(c driver.Controller) *types.VirtualNetwork {
+func createTestContrailNetwork(c ports.Controller) *types.VirtualNetwork {
 	network, err := c.CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR)
 	Expect(err).ToNot(HaveOccurred())
 	return network
@@ -939,7 +940,7 @@ func getTheOnlyHNSEndpoint(d *driver.ContrailDriver) (*hcsshim.HNSEndpoint, stri
 	return hnsEndpoint, hnsEndpointID
 }
 
-func setupNetworksAndEndpoints(c driver.Controller, docker *dockerClient.Client) (
+func setupNetworksAndEndpoints(c ports.Controller, docker *dockerClient.Client) (
 	*types.VirtualNetwork, string, string) {
 	contrailNet := createTestContrailNetwork(c)
 	dockerNetID := createValidDockerNetwork(docker)
