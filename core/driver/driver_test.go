@@ -28,14 +28,14 @@ import (
 
 	"github.com/Juniper/contrail-go-api/types"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns/win_networking"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hyperv_extension"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns/win_networking"
+	netSim "github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/simulator"
 	"github.com/Juniper/contrail-windows-docker-driver/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/core/driver"
 	"github.com/Juniper/contrail-windows-docker-driver/core/vrouter"
-	"github.com/Juniper/contrail-windows-docker-driver/hnsManager"
 	"github.com/Microsoft/hcsshim"
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerTypesContainer "github.com/docker/docker/api/types/container"
@@ -116,7 +116,7 @@ func getDockerNetwork(docker *dockerClient.Client, dockerNetID string) (dockerTy
 var fakeVRouter driver.VRouter
 var contrailController driver.Controller
 var contrailDriver *driver.ContrailDriver
-var hnsMgr *hnsManager.HNSManager
+var localContrailNetworksRepo driver.LocalContrailNetworkRepository
 var project *types.Project
 
 const (
@@ -135,7 +135,7 @@ type OneTimeListener struct {
 var _ = Describe("Contrail Network Driver", func() {
 
 	BeforeEach(func() {
-		fakeVRouter, contrailDriver, contrailController, hnsMgr, project = newModulesUnderTest()
+		fakeVRouter, contrailDriver, contrailController, localContrailNetworksRepo, project = newModulesUnderTest()
 	})
 	AfterEach(func() {
 		if contrailDriver.IsServing {
@@ -241,7 +241,7 @@ var _ = PDescribe("On requests from docker daemon", func() {
 	var docker *dockerClient.Client
 
 	BeforeEach(func() {
-		fakeVRouter, contrailDriver, contrailController, hnsMgr, project = newModulesUnderTest()
+		fakeVRouter, contrailDriver, contrailController, localContrailNetworksRepo, project = newModulesUnderTest()
 
 		err := contrailDriver.StartServing()
 		Expect(err).ToNot(HaveOccurred())
@@ -361,7 +361,7 @@ var _ = PDescribe("On requests from docker daemon", func() {
 		var contrailNet *types.VirtualNetwork
 
 		assertRemovesHNSNet := func() {
-			resp, err := hnsMgr.GetNetwork(tenantName, networkName,
+			resp, err := localContrailNetworksRepo.GetNetwork(tenantName, networkName,
 				subnetCIDR)
 			Expect(err).To(HaveOccurred())
 			Expect(resp).To(BeNil())
@@ -399,7 +399,7 @@ var _ = PDescribe("On requests from docker daemon", func() {
 		Context("HNS network doesn't exist", func() {
 			// for example, HNS was hard-reset while docker wasn't.
 			BeforeEach(func() {
-				hnsMgr.DeleteNetwork(tenantName, networkName, subnetCIDR)
+				localContrailNetworksRepo.DeleteNetwork(tenantName, networkName, subnetCIDR)
 				err := removeDockerNetwork(docker, dockerNetID)
 				Expect(err).ToNot(HaveOccurred())
 			})
@@ -408,7 +408,7 @@ var _ = PDescribe("On requests from docker daemon", func() {
 		})
 
 		Context("Contrail network doesn't exist", func() {
-			// for example, somebody deleted Contrail network before removing docker/adapters/secondary/hns
+			// for example, somebody deleted Contrail network before removing HNS network
 			BeforeEach(func() {
 				err := contrailController.DeleteElementRecursive(contrailNet)
 				Expect(err).ToNot(HaveOccurred())
@@ -514,7 +514,7 @@ var _ = PDescribe("On requests from docker daemon", func() {
 				_ = createTestContrailNetwork(contrailController)
 				_ = createValidDockerNetwork(docker)
 
-				hnsMgr.DeleteNetwork(tenantName, networkName, subnetCIDR)
+				localContrailNetworksRepo.DeleteNetwork(tenantName, networkName, subnetCIDR)
 			})
 			It("responds with err", func() {
 				var err error
@@ -798,7 +798,7 @@ var _ = PDescribe("On requests from docker daemon", func() {
 	})
 })
 
-func newModulesUnderTest() (vr driver.VRouter, d *driver.ContrailDriver, c driver.Controller, h *hnsManager.HNSManager, p *types.Project) {
+func newModulesUnderTest() (vr driver.VRouter, d *driver.ContrailDriver, c driver.Controller, h driver.LocalContrailNetworkRepository, p *types.Project) {
 	var err error
 
 	ext := &hyperv_extension.HyperVExtensionSimulator{
@@ -812,10 +812,10 @@ func newModulesUnderTest() (vr driver.VRouter, d *driver.ContrailDriver, c drive
 	p, err = c.NewProject(common.DomainName, tenantName)
 	Expect(err).ToNot(HaveOccurred())
 
-	h = &hnsManager.HNSManager{}
+	r := &netSim.InMemContrailNetworksRepository{}
 	serverUrl, _ := url.Parse("http://127.0.0.1:9091")
 	a := agent.NewAgentRestAPI(http.DefaultClient, serverUrl)
-	d = driver.NewDriver(netAdapter, vr, c, a, h)
+	d = driver.NewDriver(netAdapter, vr, c, a, r)
 
 	return
 }
@@ -925,7 +925,7 @@ func deleteTheOnlyHNSEndpoint(d *driver.ContrailDriver) {
 }
 
 func getTheOnlyHNSEndpoint(d *driver.ContrailDriver) (*hcsshim.HNSEndpoint, string) {
-	hnsNets, err := hnsMgr.ListNetworks()
+	hnsNets, err := localContrailNetworksRepo.ListNetworks()
 	Expect(err).ToNot(HaveOccurred())
 	Expect(hnsNets).To(HaveLen(1))
 	eps, err := hns.ListHNSEndpointsOfNetwork(hnsNets[0].Id)

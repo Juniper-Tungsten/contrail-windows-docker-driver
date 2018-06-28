@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns/win_networking/retry"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns/win_networking/retry"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

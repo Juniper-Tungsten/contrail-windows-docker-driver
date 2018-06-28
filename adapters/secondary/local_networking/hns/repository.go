@@ -13,34 +13,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package hnsManager
+package hns
 
 import (
 	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/Microsoft/hcsshim"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns"
+	"github.com/Microsoft/hcsshim"
 )
 
-// HNSManager manages HNS networks that are used by the driver.
-type HNSManager struct {
-	// TODO JW-154: store networks here that you know about. If not found here, look in HNS.
-	// for now, just look in HNS by name.
-}
+// HNSContrailNetworksRepository handles local HNS networks associated to Contrail subnets.
+// It does it by naming the HNS networks in a specific way. The name of HNS network contains
+// Contrail FQ (fully qualified) name as well as subnet CIDR. This guarantees 1-to-1 correspondence
+// of HNS network with a Contrail subnet. Also, it keeps the driver stateless (relevant state is
+// held directly in HNS). An alternative would be to have a local DB (like SQLite) that stores
+// associations.
+type HNSContrailNetworksRepository struct{}
 
-func contrailHNSNetName(tenant, netName, subnetCIDR string) string {
+func associationNameForHNSNetworkContrailSubnet(tenant, netName, subnetCIDR string) string {
 	return fmt.Sprintf("%s:%s:%s:%s", common.HNSNetworkPrefix, tenant, netName, subnetCIDR)
 }
 
-func (m *HNSManager) CreateNetwork(netAdapter common.AdapterName, tenantName, networkName,
+func (repo *HNSContrailNetworksRepository) CreateNetwork(netAdapter common.AdapterName, tenantName, networkName,
 	subnetCIDR, defaultGW string) (*hcsshim.HNSNetwork, error) {
 
-	hnsNetName := contrailHNSNetName(tenantName, networkName, subnetCIDR)
+	hnsNetName := associationNameForHNSNetworkContrailSubnet(tenantName, networkName, subnetCIDR)
 
-	net, err := hns.GetHNSNetworkByName(hnsNetName)
+	net, err := GetHNSNetworkByName(hnsNetName)
 	if net != nil {
 		return nil, errors.New("Such HNS network already exists")
 	}
@@ -59,12 +60,12 @@ func (m *HNSManager) CreateNetwork(netAdapter common.AdapterName, tenantName, ne
 		Subnets:            subnets,
 	}
 
-	hnsNetworkID, err := hns.CreateHNSNetwork(configuration)
+	hnsNetworkID, err := CreateHNSNetwork(configuration)
 	if err != nil {
 		return nil, err
 	}
 
-	hnsNetwork, err := hns.GetHNSNetwork(hnsNetworkID)
+	hnsNetwork, err := GetHNSNetwork(hnsNetworkID)
 	if err != nil {
 		return nil, err
 	}
@@ -72,10 +73,10 @@ func (m *HNSManager) CreateNetwork(netAdapter common.AdapterName, tenantName, ne
 	return hnsNetwork, nil
 }
 
-func (m *HNSManager) GetNetwork(tenantName, networkName, subnetCIDR string) (*hcsshim.HNSNetwork,
+func (repo *HNSContrailNetworksRepository) GetNetwork(tenantName, networkName, subnetCIDR string) (*hcsshim.HNSNetwork,
 	error) {
-	hnsNetName := contrailHNSNetName(tenantName, networkName, subnetCIDR)
-	hnsNetwork, err := hns.GetHNSNetworkByName(hnsNetName)
+	hnsNetName := associationNameForHNSNetworkContrailSubnet(tenantName, networkName, subnetCIDR)
+	hnsNetwork, err := GetHNSNetworkByName(hnsNetName)
 	if err != nil {
 		return nil, err
 	}
@@ -85,12 +86,12 @@ func (m *HNSManager) GetNetwork(tenantName, networkName, subnetCIDR string) (*hc
 	return hnsNetwork, nil
 }
 
-func (m *HNSManager) DeleteNetwork(tenantName, networkName, subnetCIDR string) error {
-	hnsNetwork, err := m.GetNetwork(tenantName, networkName, subnetCIDR)
+func (repo *HNSContrailNetworksRepository) DeleteNetwork(tenantName, networkName, subnetCIDR string) error {
+	hnsNetwork, err := repo.GetNetwork(tenantName, networkName, subnetCIDR)
 	if err != nil {
 		return err
 	}
-	endpoints, err := hns.ListHNSEndpoints()
+	endpoints, err := ListHNSEndpoints()
 	if err != nil {
 		return err
 	}
@@ -100,12 +101,12 @@ func (m *HNSManager) DeleteNetwork(tenantName, networkName, subnetCIDR string) e
 			return errors.New("Cannot delete network with active endpoints")
 		}
 	}
-	return hns.DeleteHNSNetwork(hnsNetwork.Id)
+	return DeleteHNSNetwork(hnsNetwork.Id)
 }
 
-func (m *HNSManager) ListNetworks() ([]hcsshim.HNSNetwork, error) {
+func (repo *HNSContrailNetworksRepository) ListNetworks() ([]hcsshim.HNSNetwork, error) {
 	var validNets []hcsshim.HNSNetwork
-	nets, err := hns.ListHNSNetworks()
+	nets, err := ListHNSNetworks()
 	if err != nil {
 		return validNets, err
 	}

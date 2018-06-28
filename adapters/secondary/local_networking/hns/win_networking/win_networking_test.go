@@ -20,7 +20,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns/win_networking"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns/win_networking"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"

@@ -30,10 +30,9 @@ import (
 	"context"
 
 	"github.com/Juniper/contrail-go-api/types"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
-	"github.com/Juniper/contrail-windows-docker-driver/hnsManager"
-	"github.com/Microsoft/go-winio"
+	winio "github.com/Microsoft/go-winio"
 	"github.com/Microsoft/hcsshim"
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerClient "github.com/docker/docker/client"
@@ -46,16 +45,16 @@ import (
 const hnsEndpointWaitingTime = 5
 
 type ContrailDriver struct {
-	vrouter            VRouter
-	controller         Controller
-	agent              Agent
-	hnsMgr             *hnsManager.HNSManager
-	networkAdapter     common.AdapterName
-	listener           net.Listener
-	PipeAddr           string
-	stopReasonChan     chan error
-	stoppedServingChan chan interface{}
-	IsServing          bool
+	vrouter                   VRouter
+	controller                Controller
+	agent                     Agent
+	localContrailNetworksRepo LocalContrailNetworkRepository
+	networkAdapter            common.AdapterName
+	listener                  net.Listener
+	PipeAddr                  string
+	stopReasonChan            chan error
+	stoppedServingChan        chan interface{}
+	IsServing                 bool
 }
 
 type NetworkMeta struct {
@@ -65,18 +64,18 @@ type NetworkMeta struct {
 }
 
 func NewDriver(adapter string, vr VRouter, c Controller, agent Agent,
-	hnsMgr *hnsManager.HNSManager) *ContrailDriver {
+	localContrailNetworksRepo LocalContrailNetworkRepository) *ContrailDriver {
 
 	d := &ContrailDriver{
-		vrouter:            vr,
-		controller:         c,
-		agent:              agent,
-		hnsMgr:             hnsMgr,
-		networkAdapter:     common.AdapterName(adapter),
-		PipeAddr:           "//./pipe/" + common.DriverName,
-		stopReasonChan:     make(chan error, 1),
-		stoppedServingChan: make(chan interface{}, 1),
-		IsServing:          false,
+		vrouter:    vr,
+		controller: c,
+		agent:      agent,
+		localContrailNetworksRepo: localContrailNetworksRepo,
+		networkAdapter:            common.AdapterName(adapter),
+		PipeAddr:                  "//./pipe/" + common.DriverName,
+		stopReasonChan:            make(chan error, 1),
+		stoppedServingChan:        make(chan interface{}, 1),
+		IsServing:                 false,
 	}
 	return d
 }
@@ -265,7 +264,7 @@ func (d *ContrailDriver) CreateNetwork(req *network.CreateNetworkRequest) error 
 		return errors.New("Default GW is empty")
 	}
 
-	_, err = d.hnsMgr.CreateNetwork(d.networkAdapter, tenant.(string), netName.(string),
+	_, err = d.localContrailNetworksRepo.CreateNetwork(d.networkAdapter, tenant.(string), netName.(string),
 		subnetCIDR, contrailGateway)
 
 	return err
@@ -315,7 +314,7 @@ func (d *ContrailDriver) DeleteNetwork(req *network.DeleteNetworkRequest) error 
 	if toRemove == nil {
 		return errors.New("During handling of DeleteNetwork, couldn't find net to remove")
 	}
-	return d.hnsMgr.DeleteNetwork(toRemove.tenant, toRemove.network, toRemove.subnetCIDR)
+	return d.localContrailNetworksRepo.DeleteNetwork(toRemove.tenant, toRemove.network, toRemove.subnetCIDR)
 }
 
 func (d *ContrailDriver) FreeNetwork(req *network.FreeNetworkRequest) error {
@@ -397,7 +396,7 @@ func (d *ContrailDriver) CreateEndpoint(req *network.CreateEndpointRequest) (
 	// HNS needs MACs like 11-22-AA-BB-CC-DD
 	formattedMac := strings.Replace(strings.ToUpper(contrailMac), ":", "-", -1)
 
-	hnsNet, err := d.hnsMgr.GetNetwork(meta.tenant, meta.network, contrailSubnetCIDR)
+	hnsNet, err := d.localContrailNetworksRepo.GetNetwork(meta.tenant, meta.network, contrailSubnetCIDR)
 	if err != nil {
 		return nil, err
 	}
@@ -710,7 +709,7 @@ func (d *ContrailDriver) dockerNetworksMeta() ([]NetworkMeta, error) {
 }
 
 func (d *ContrailDriver) hnsNetworksMeta() ([]NetworkMeta, error) {
-	hnsNetworks, err := d.hnsMgr.ListNetworks()
+	hnsNetworks, err := d.localContrailNetworksRepo.ListNetworks()
 	if err != nil {
 		return nil, err
 	}
