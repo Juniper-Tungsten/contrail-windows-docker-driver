@@ -45,16 +45,17 @@ import (
 const hnsEndpointWaitingTime = 5
 
 type ContrailDriver struct {
-	vrouter                   VRouter
-	controller                Controller
-	agent                     Agent
-	localContrailNetworksRepo LocalContrailNetworkRepository
-	networkAdapter            common.AdapterName
-	listener                  net.Listener
-	PipeAddr                  string
-	stopReasonChan            chan error
-	stoppedServingChan        chan interface{}
-	IsServing                 bool
+	vrouter                    VRouter
+	controller                 Controller
+	agent                      Agent
+	localContrailNetworksRepo  LocalContrailNetworkRepository
+	localContrailEndpointsRepo LocalContrailEndpointRepository
+	networkAdapter             common.AdapterName
+	listener                   net.Listener
+	PipeAddr                   string
+	stopReasonChan             chan error
+	stoppedServingChan         chan interface{}
+	IsServing                  bool
 }
 
 type NetworkMeta struct {
@@ -64,18 +65,19 @@ type NetworkMeta struct {
 }
 
 func NewDriver(adapter string, vr VRouter, c Controller, agent Agent,
-	localContrailNetworksRepo LocalContrailNetworkRepository) *ContrailDriver {
+	networksRepo LocalContrailNetworkRepository, endpointsRepo LocalContrailEndpointRepository) *ContrailDriver {
 
 	d := &ContrailDriver{
 		vrouter:    vr,
 		controller: c,
 		agent:      agent,
-		localContrailNetworksRepo: localContrailNetworksRepo,
-		networkAdapter:            common.AdapterName(adapter),
-		PipeAddr:                  "//./pipe/" + common.DriverName,
-		stopReasonChan:            make(chan error, 1),
-		stoppedServingChan:        make(chan interface{}, 1),
-		IsServing:                 false,
+		localContrailNetworksRepo:  networksRepo,
+		localContrailEndpointsRepo: endpointsRepo,
+		networkAdapter:             common.AdapterName(adapter),
+		PipeAddr:                   "//./pipe/" + common.DriverName,
+		stopReasonChan:             make(chan error, 1),
+		stoppedServingChan:         make(chan interface{}, 1),
+		IsServing:                  false,
 	}
 	return d
 }
@@ -409,7 +411,7 @@ func (d *ContrailDriver) CreateEndpoint(req *network.CreateEndpointRequest) (
 		GatewayAddress:     contrailGateway,
 	}
 
-	hnsEndpointID, err := hns.CreateHNSEndpoint(hnsEndpointConfig)
+	hnsEndpointID, err := d.localContrailEndpointsRepo.CreateEndpoint(hnsEndpointConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -489,7 +491,7 @@ func (d *ContrailDriver) DeleteEndpoint(req *network.DeleteEndpointRequest) erro
 	}
 
 	hnsEpName := req.EndpointID
-	epToDelete, err := hns.GetHNSEndpointByName(hnsEpName)
+	epToDelete, err := d.localContrailEndpointsRepo.GetEndpointByName(hnsEpName)
 	if err != nil {
 		return err
 	}
@@ -498,7 +500,7 @@ func (d *ContrailDriver) DeleteEndpoint(req *network.DeleteEndpointRequest) erro
 		return nil
 	}
 
-	return hns.DeleteHNSEndpoint(epToDelete.Id)
+	return d.localContrailEndpointsRepo.DeleteEndpoint(epToDelete.Id)
 }
 
 func (d *ContrailDriver) EndpointInfo(req *network.InfoRequest) (*network.InfoResponse, error) {
@@ -506,7 +508,7 @@ func (d *ContrailDriver) EndpointInfo(req *network.InfoRequest) (*network.InfoRe
 	log.Debugln(req)
 
 	hnsEpName := req.EndpointID
-	hnsEp, err := hns.GetHNSEndpointByName(hnsEpName)
+	hnsEp, err := d.localContrailEndpointsRepo.GetEndpointByName(hnsEpName)
 	if err != nil {
 		return nil, err
 	}
@@ -533,7 +535,7 @@ func (d *ContrailDriver) Join(req *network.JoinRequest) (*network.JoinResponse, 
 		fmt.Printf("%v: %v\n", k, v)
 	}
 
-	hnsEp, err := hns.GetHNSEndpointByName(req.EndpointID)
+	hnsEp, err := d.localContrailEndpointsRepo.GetEndpointByName(req.EndpointID)
 	if err != nil {
 		return nil, err
 	}
@@ -553,7 +555,7 @@ func (d *ContrailDriver) Leave(req *network.LeaveRequest) error {
 	log.Debugln("=== Leave")
 	log.Debugln(req)
 
-	hnsEp, err := hns.GetHNSEndpointByName(req.EndpointID)
+	hnsEp, err := d.localContrailEndpointsRepo.GetEndpointByName(req.EndpointID)
 	if err != nil {
 		return err
 	}
