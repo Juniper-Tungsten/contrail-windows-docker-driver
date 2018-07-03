@@ -31,25 +31,48 @@ import (
 type Info struct {
 }
 
-type ControllerAdapter struct {
+type ControllerAdapterImpl struct {
 	ApiClient contrail.ApiClient
 }
 
-func newControllerAdapter(apiClient contrail.ApiClient) *ControllerAdapter {
-	client := &ControllerAdapter{ApiClient: apiClient}
+// TODO: this factory function is public only because we have a bunch of tests for
+// ControllerAdapterImpl methods. We should instead test via the Facade - ControllerAdapter.
+// I decided against rewriting all the tests for now, but it would be an improvement.
+// Right now, ControllerAdapterImpl test the implementation, and not the behaviour.
+func NewControllerAdapterImpl(apiClient contrail.ApiClient) *ControllerAdapterImpl {
+	client := &ControllerAdapterImpl{ApiClient: apiClient}
 	return client
 }
 
-func (c *ControllerAdapter) NewProject(domain, tenant string) (*types.Project, error) {
+// TODO: this method is only used by tests - it can probably be removed from ControllerAdapterImpl
+// entirely and moved to helpers.
+func (c *ControllerAdapterImpl) NewProject(domain, tenant string) (*types.Project, error) {
 	project := new(types.Project)
 	project.SetFQName("domain", []string{domain, tenant})
 	if err := c.ApiClient.Create(project); err != nil {
 		return nil, err
 	}
+
+	// Create security group as soon as project is created. This mimics contrail API server
+	// behaviuor. We can do it here, because NewProject method is used only in tests (see
+	// method comment).
+	if _, err := c.createSecurityGroup(domain, tenant); err != nil {
+		return nil, err
+	}
+
 	return project, nil
 }
 
-func (c *ControllerAdapter) CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, error) {
+func (c *ControllerAdapterImpl) createSecurityGroup(domain, tenant string) (*types.SecurityGroup, error) {
+	secgroup := new(types.SecurityGroup)
+	secgroup.SetFQName("project", []string{domain, tenant, "default"})
+	if err := c.ApiClient.Create(secgroup); err != nil {
+		return nil, err
+	}
+	return secgroup, nil
+}
+
+func (c *ControllerAdapterImpl) CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, error) {
 	net, err := c.GetNetwork(tenantName, networkName)
 	if err == nil {
 		showDetails := true
@@ -82,7 +105,7 @@ func (c *ControllerAdapter) CreateNetworkWithSubnet(tenantName, networkName, sub
 	return net, nil
 }
 
-func (c *ControllerAdapter) GetNetwork(tenantName, networkName string) (*types.VirtualNetwork,
+func (c *ControllerAdapterImpl) GetNetwork(tenantName, networkName string) (*types.VirtualNetwork,
 	error) {
 	name := fmt.Sprintf("%s:%s:%s", common.DomainName, tenantName, networkName)
 	net, err := types.VirtualNetworkByName(c.ApiClient, name)
@@ -95,7 +118,7 @@ func (c *ControllerAdapter) GetNetwork(tenantName, networkName string) (*types.V
 
 // GetIpamSubnet returns IPAM subnet of specified virtual network with specified CIDR.
 // If virtual network has only one subnet, CIDR is ignored.
-func (c *ControllerAdapter) GetIpamSubnet(net *types.VirtualNetwork, CIDR string) (
+func (c *ControllerAdapterImpl) GetIpamSubnet(net *types.VirtualNetwork, CIDR string) (
 	*types.IpamSubnetType, error) {
 
 	if strings.HasPrefix(CIDR, "0.0.0.0") {
@@ -150,7 +173,7 @@ func (c *ControllerAdapter) GetIpamSubnet(net *types.VirtualNetwork, CIDR string
 	return nil, err
 }
 
-func (c *ControllerAdapter) GetDefaultGatewayIp(subnet *types.IpamSubnetType) (string, error) {
+func (c *ControllerAdapterImpl) GetDefaultGatewayIp(subnet *types.IpamSubnetType) (string, error) {
 	gw := subnet.DefaultGateway
 	if gw == "" {
 		err := errors.New("Default GW is empty")
@@ -160,7 +183,7 @@ func (c *ControllerAdapter) GetDefaultGatewayIp(subnet *types.IpamSubnetType) (s
 	return gw, nil
 }
 
-func (c *ControllerAdapter) GetOrCreateInstance(vif *types.VirtualMachineInterface, containerId string) (
+func (c *ControllerAdapterImpl) GetOrCreateInstance(vif *types.VirtualMachineInterface, containerId string) (
 	*types.VirtualMachine, error) {
 	instance, err := c.GetInstance(containerId)
 	if err == nil {
@@ -199,12 +222,12 @@ func (c *ControllerAdapter) GetOrCreateInstance(vif *types.VirtualMachineInterfa
 	return createdInstance, nil
 }
 
-func (c *ControllerAdapter) GetInstance(containerId string) (
+func (c *ControllerAdapterImpl) GetInstance(containerId string) (
 	*types.VirtualMachine, error) {
 	return types.VirtualMachineByName(c.ApiClient, containerId)
 }
 
-func (c *ControllerAdapter) GetExistingInterface(net *types.VirtualNetwork, tenantName,
+func (c *ControllerAdapterImpl) GetExistingInterface(net *types.VirtualNetwork, tenantName,
 	containerId string) (*types.VirtualMachineInterface, error) {
 
 	fqName := fmt.Sprintf("%s:%s:%s", common.DomainName, tenantName, containerId)
@@ -220,7 +243,7 @@ func (c *ControllerAdapter) GetExistingInterface(net *types.VirtualNetwork, tena
 	return nil, errors.New("Interface does not exist")
 }
 
-func (c *ControllerAdapter) GetOrCreateInterface(net *types.VirtualNetwork, tenantName,
+func (c *ControllerAdapterImpl) GetOrCreateInterface(net *types.VirtualNetwork, tenantName,
 	containerId string) (*types.VirtualMachineInterface, error) {
 
 	fqName := fmt.Sprintf("%s:%s:%s", common.DomainName, tenantName, containerId)
@@ -259,7 +282,7 @@ func (c *ControllerAdapter) GetOrCreateInterface(net *types.VirtualNetwork, tena
 	return createdIface, nil
 }
 
-func (c *ControllerAdapter) assignDefaultSecurityGroup(iface *types.VirtualMachineInterface, tenantName string) error {
+func (c *ControllerAdapterImpl) assignDefaultSecurityGroup(iface *types.VirtualMachineInterface, tenantName string) error {
 	secGroupFqName := fmt.Sprintf("%s:%s:default", common.DomainName, tenantName)
 	secGroup, err := types.SecurityGroupByName(c.ApiClient, secGroupFqName)
 	if err != nil || secGroup == nil {
@@ -269,7 +292,7 @@ func (c *ControllerAdapter) assignDefaultSecurityGroup(iface *types.VirtualMachi
 	return iface.AddSecurityGroup(secGroup)
 }
 
-func (c *ControllerAdapter) GetInterfaceMac(iface *types.VirtualMachineInterface) (string, error) {
+func (c *ControllerAdapterImpl) GetInterfaceMac(iface *types.VirtualMachineInterface) (string, error) {
 	macs := iface.GetVirtualMachineInterfaceMacAddresses()
 	if len(macs.MacAddress) == 0 {
 		err := errors.New("Empty MAC list")
@@ -279,7 +302,7 @@ func (c *ControllerAdapter) GetInterfaceMac(iface *types.VirtualMachineInterface
 	return macs.MacAddress[0], nil
 }
 
-func (c *ControllerAdapter) GetOrCreateInstanceIp(net *types.VirtualNetwork,
+func (c *ControllerAdapterImpl) GetOrCreateInstanceIp(net *types.VirtualNetwork,
 	iface *types.VirtualMachineInterface, subnetUuid string) (*types.InstanceIp, error) {
 	instIp, err := types.InstanceIpByName(c.ApiClient, iface.GetName())
 	if err == nil && instIp != nil {
@@ -314,7 +337,7 @@ func (c *ControllerAdapter) GetOrCreateInstanceIp(net *types.VirtualNetwork,
 	return allocatedIP, nil
 }
 
-func (c *ControllerAdapter) DeleteElementRecursive(parent contrail.IObject) error {
+func (c *ControllerAdapterImpl) DeleteElementRecursive(parent contrail.IObject) error {
 	log.Debugln("Deleting", parent.GetType(), parent.GetUuid())
 	for err := c.ApiClient.Delete(parent); err != nil; err = c.ApiClient.Delete(parent) {
 		// TODO: when fixing this method, consider using c.is404() method.
@@ -359,6 +382,6 @@ func (c *ControllerAdapter) DeleteElementRecursive(parent contrail.IObject) erro
 	return nil
 }
 
-func (c *ControllerAdapter) is404(err error) bool {
+func (c *ControllerAdapterImpl) is404(err error) bool {
 	return strings.HasPrefix(err.Error(), "404")
 }

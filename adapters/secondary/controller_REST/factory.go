@@ -33,10 +33,12 @@ func NewControllerWithKeystoneAdapter(keys *auth.KeystoneParams, ip string, port
 
 	apiClient := api.NewApiClient(ip, port, auth)
 
-	return newControllerAdapter(apiClient), nil
+	impl := NewControllerAdapterImpl(apiClient)
+	return newControllerAdapter(impl), nil
 }
 
 func NewFakeControllerAdapter() *ControllerAdapter {
 	fakeApiClient := api.NewFakeApiClient()
-	return newControllerAdapter(fakeApiClient)
+	impl := NewControllerAdapterImpl(fakeApiClient)
+	return newControllerAdapter(impl)
 }

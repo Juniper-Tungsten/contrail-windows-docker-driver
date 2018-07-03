@@ -73,9 +73,9 @@ var _ = BeforeSuite(func() {
 	// }
 })
 
-var _ = Describe("ControllerAdapter", func() {
+var _ = Describe("ControllerAdapterImpl", func() {
 
-	var client *ControllerAdapter
+	var client *ControllerAdapterImpl
 	var project *types.Project
 
 	BeforeEach(func() {
@@ -355,9 +355,6 @@ var _ = Describe("ControllerAdapter", func() {
 		})
 		Context("when vif doesn't exist in Contrail", func() {
 			Context("when default security group exists", func() {
-				BeforeEach(func() {
-					CreateTestSecurityGroup(client.ApiClient, "default", project)
-				})
 				It("creates a new vif", func() {
 					iface, err := client.GetOrCreateInterface(testNetwork, tenantName, containerID)
 					Expect(err).ToNot(HaveOccurred())
@@ -378,6 +375,9 @@ var _ = Describe("ControllerAdapter", func() {
 				})
 			})
 			Context("when default security group doesn't exist", func() {
+				BeforeEach(func() {
+					RemoveTestSecurityGroup(client.ApiClient, "default", project)
+				})
 				It("returns an error", func() {
 					iface, err := client.GetOrCreateInterface(testNetwork, tenantName, containerID)
 					Expect(err).To(HaveOccurred())
@@ -524,9 +524,6 @@ var _ = Describe("ControllerAdapter", func() {
 		})
 		Context("when instance IP doesn't exist in Contrail", func() {
 			It("creates new instance IP", func() {
-				if !useActualController {
-					Skip("test fails (pending) when using mocked client")
-				}
 				instanceIP, err := client.GetOrCreateInstanceIp(testNetwork, testInterface, "")
 				Expect(err).ToNot(HaveOccurred())
 				Expect(instanceIP).ToNot(BeNil())

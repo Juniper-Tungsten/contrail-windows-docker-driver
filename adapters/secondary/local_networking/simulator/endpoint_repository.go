@@ -21,14 +21,27 @@ import (
 	"github.com/Microsoft/hcsshim"
 )
 
-type InMemEndpointRepository struct{}
+type InMemEndpointRepository struct {
+	endpoints map[string]hcsshim.HNSEndpoint
+}
+
+func NewInMemEndpointRepository() *InMemEndpointRepository {
+	return &InMemEndpointRepository{
+		endpoints: make(map[string]hcsshim.HNSEndpoint),
+	}
+}
 
 func (repo *InMemEndpointRepository) CreateEndpoint(configuration *hcsshim.HNSEndpoint) (string, error) {
-	return "", errors.New("Not implemented yet")
+	repo.endpoints[configuration.Name] = *configuration
+	return configuration.Id, nil
 }
 
 func (repo *InMemEndpointRepository) GetEndpointByName(name string) (*hcsshim.HNSEndpoint, error) {
-	return nil, errors.New("Not implemented yet")
+	if ep, exists := repo.endpoints[name]; exists {
+		return &ep, nil
+	} else {
+		return nil, errors.New("endpoint not found")
+	}
 }
 
 func (repo *InMemEndpointRepository) DeleteEndpoint(endpointID string) error {

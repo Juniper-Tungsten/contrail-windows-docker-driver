@@ -17,9 +17,11 @@
 package driver_core_test
 
 import (
+	"net"
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/Juniper/contrail-go-api/types"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
@@ -34,12 +36,14 @@ import (
 	. "github.com/onsi/ginkgo/extensions/table"
 	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/ghttp"
 )
 
 const (
-	tenantName  = "agatka"
-	networkName = "test_net"
-	subnetCIDR  = "1.2.3.4/24"
+	tenantName        = "agatka"
+	networkName       = "test_net"
+	securityGroupName = "default"
+	subnetCIDR        = "1.2.3.0/24"
 )
 
 func TestCore(t *testing.T) {
@@ -53,9 +57,10 @@ var _ = Describe("Core tests", func() {
 	var testedCore *driver_core.ContrailDriverCore
 	var controller ports.Controller
 	var localNetRepo ports.LocalContrailNetworkRepository
+	var localEpRepo ports.LocalContrailEndpointRepository
 
 	BeforeEach(func() {
-		testedCore, controller, localNetRepo = newSimulatedModulesUnderTest()
+		testedCore, controller, localNetRepo, localEpRepo = newSimulatedModulesUnderTest()
 	})
 
 	Context("CreateNetwork", func() {
@@ -103,6 +108,115 @@ var _ = Describe("Core tests", func() {
 	})
 
 	Context("CreateEndpoint", func() {
+		var recvChan chan interface{}
+		var server *ghttp.Server
+		BeforeEach(func() {
+			recvChan = make(chan interface{})
+			server = testServer(recvChan)
+			server.AppendHandlers(
+				ghttp.VerifyRequest("POST", "/port"),
+				ghttp.RespondWith(http.StatusOK, ""),
+			)
+		})
+		AfterEach(func() {
+			server.Close()
+		})
+
+		endpointID := "1234"
+
+		Context("Controller network and local network exist", func() {
+			BeforeEach(func() {
+				_ = testProject(controller)
+				_ = testNetwork(controller)
+				err := testedCore.CreateNetwork(tenantName, networkName, subnetCIDR)
+				Expect(err).ToNot(HaveOccurred())
+
+				server.AppendHandlers(
+					ghttp.VerifyRequest("POST", "/port"),
+					ghttp.RespondWith(http.StatusOK, ""),
+				)
+			})
+			AfterEach(func() {
+				// Because right now port request is send asynchronously in a goroutine, we need to
+				// wait after each test case for any requests before moving onto the next test case.
+				// This is to ensure test isolation. Otherwise, the async request may "spill over" to
+				// the next test case which would be hard to debug.
+				By("notifies port listener")
+				Eventually(func() []*http.Request {
+					return server.ReceivedRequests()
+				}).Should(HaveLen(1))
+			})
+			It("returns container resource allocated in controller", func() {
+				container, err := testedCore.CreateEndpoint(tenantName, networkName, subnetCIDR, endpointID)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(container.IP).To(MatchRegexp(`1.2.3.[0-9]+`))
+				Expect(container.PrefixLen).To(Equal(24))
+				Expect(container.Mac).To(MatchRegexp(`([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})`))
+				Expect(container.VmUUID).ToNot(Equal(""))
+				Expect(container.VmiUUID).ToNot(Equal(""))
+			})
+			It("configures HNS endpoint", func() {
+				_, err := testedCore.CreateEndpoint(tenantName, networkName, subnetCIDR, endpointID)
+				Expect(err).ToNot(HaveOccurred())
+
+				ep, err := localEpRepo.GetEndpointByName(endpointID)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(ep).ToNot(BeNil())
+				Expect(ep.Name).To(Equal(endpointID))
+			})
+		})
+
+		assertErrors := func() {
+			container, err := testedCore.CreateEndpoint(tenantName, networkName, subnetCIDR, endpointID)
+			Expect(err).To(HaveOccurred())
+			Expect(container).To(BeNil())
+		}
+		assertDoesNotAllocate := func() {
+			container, err := testedCore.CreateEndpoint(tenantName, networkName, subnetCIDR, endpointID)
+			Expect(err).To(HaveOccurred())
+			Expect(container).To(BeNil())
+		}
+		assertDoesNotConfigure := func() {
+			_, err := testedCore.CreateEndpoint(tenantName, networkName, subnetCIDR, endpointID)
+			Expect(err).To(HaveOccurred())
+
+			ep, err := localEpRepo.GetEndpointByName(endpointID)
+			Expect(err).To(HaveOccurred())
+			Expect(ep).To(BeNil())
+		}
+		assertAfterEachDoesNotNotify := func() {
+			// Because right now port request is send asynchronously in a goroutine, we need to
+			// wait after each test case for any requests before moving onto the next test case.
+			// This is to ensure test isolation. Otherwise, the async request may "spill over" to
+			// the next test case which would be hard to debug.
+			By("does not notify port listener")
+			Consistently(func() []*http.Request {
+				return server.ReceivedRequests()
+			}).Should(HaveLen(0))
+		}
+		Context("Contrail network exists, but local network does not exist", func() {
+			BeforeEach(func() {
+				_ = testProject(controller)
+				_ = testNetwork(controller)
+			})
+			AfterEach(assertAfterEachDoesNotNotify)
+			It("errors", assertErrors)
+			It("doesn't allocate resources in controller", assertDoesNotAllocate)
+			It("doesn't configure HNS endpoint", assertDoesNotConfigure)
+
+		})
+		Context("Contrail network does not exist, but local network does", func() {
+			BeforeEach(func() {
+				someGateway := "1.2.3.1"
+				_, err := localNetRepo.CreateNetwork(tenantName, networkName, subnetCIDR, someGateway)
+				Expect(err).ToNot(HaveOccurred())
+			})
+			AfterEach(assertAfterEachDoesNotNotify)
+			It("errors", assertErrors)
+			It("doesn't allocate resources in controller", assertDoesNotAllocate)
+			It("doesn't configure HNS endpoint", assertDoesNotConfigure)
+		})
 	})
 
 	Context("DeleteEndpoint", func() {
@@ -110,7 +224,8 @@ var _ = Describe("Core tests", func() {
 })
 
 func newSimulatedModulesUnderTest() (c *driver_core.ContrailDriverCore, controller ports.Controller,
-	netRepo ports.LocalContrailNetworkRepository) {
+	netRepo ports.LocalContrailNetworkRepository,
+	epRepo ports.LocalContrailEndpointRepository) {
 	ext := &hyperv_extension.HyperVExtensionSimulator{
 		Enabled: false,
 		Running: true,
@@ -120,14 +235,15 @@ func newSimulatedModulesUnderTest() (c *driver_core.ContrailDriverCore, controll
 	controller = controller_rest.NewFakeControllerAdapter()
 
 	netRepo = netSim.NewInMemContrailNetworksRepository()
-	epRepo := &netSim.InMemEndpointRepository{}
+	epRepo = netSim.NewInMemEndpointRepository()
 
 	// TODO: Implement simulator for Agent.
 	serverUrl, _ := url.Parse("http://127.0.0.1:9091")
 	agent := agent.NewAgentRestAPI(http.DefaultClient, serverUrl)
 
 	var err error
-	c, err = driver_core.NewContrailDriverCore(vrouter, controller, agent, netRepo, epRepo)
+	sleepTime := time.Second * 0
+	c, err = driver_core.NewContrailDriverCore(vrouter, controller, agent, netRepo, epRepo, sleepTime)
 	Expect(err).ToNot(HaveOccurred())
 
 	return
@@ -143,4 +259,16 @@ func testNetwork(c ports.Controller) *types.VirtualNetwork {
 	network, err := c.CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR)
 	Expect(err).ToNot(HaveOccurred())
 	return network
+}
+
+func testServer(recv chan interface{}) *ghttp.Server {
+	// TODO: Refactor this test to use listener simulator, instead this test
+	// http server, when it's implemented.
+	server := ghttp.NewUnstartedServer()
+	listener, err := net.Listen("tcp", "127.0.0.1:9091")
+	Expect(err).ToNot(HaveOccurred())
+	server.HTTPTestServer.Listener = listener
+
+	server.Start()
+	return server
 }
