@@ -21,7 +21,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/Juniper/contrail-go-api"
+	contrail "github.com/Juniper/contrail-go-api"
+	"github.com/Juniper/contrail-go-api/config"
 	"github.com/Juniper/contrail-go-api/types"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	log "github.com/sirupsen/logrus"
@@ -49,8 +50,36 @@ func (c *ControllerAdapter) NewProject(domain, tenant string) (*types.Project, e
 }
 
 func (c *ControllerAdapter) CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, error) {
-	// TODO: possibly implement when fixing driver tests
-	return nil, errors.New("Not implemented - possibly TODO when fixing driver module tests.")
+	net, err := c.GetNetwork(tenantName, networkName)
+	if err == nil {
+		showDetails := true
+		details, err := config.NetworkShow(c.ApiClient, net.GetUuid(), showDetails)
+		if err != nil {
+			return nil, err
+		}
+		for _, existingCIDR := range details.Subnets {
+			if subnetCIDR == existingCIDR {
+				return net, nil
+			}
+		}
+		return nil, errors.New("such network already has a different subnet")
+	}
+	projectFQName := fmt.Sprintf("%s:%s", common.DomainName, tenantName)
+	project, err := c.ApiClient.FindByName("project", projectFQName)
+	if err != nil {
+		return nil, err
+	}
+
+	netUUID, err := config.CreateNetworkWithSubnet(c.ApiClient, project.GetUuid(), networkName, subnetCIDR)
+	if err != nil {
+		return nil, err
+	}
+
+	net, err = types.VirtualNetworkByUuid(c.ApiClient, netUUID)
+	if err != nil {
+		return nil, err
+	}
+	return net, nil
 }
 
 func (c *ControllerAdapter) GetNetwork(tenantName, networkName string) (*types.VirtualNetwork,

@@ -159,6 +159,44 @@ var _ = Describe("ControllerAdapter", func() {
 		})
 	})
 
+	Describe("creating Contrail network with subnet", func() {
+		It("when network with the same subnet already exists in Contrail, returns it", func() {
+			testNetwork := CreateTestNetworkWithSubnet(client.ApiClient, networkName, subnetCIDR, project)
+
+			net, err := client.CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(net).ToNot(BeNil())
+			Expect(net.GetNetworkIpamRefs()).To(HaveLen(1))
+			Expect(net.GetUuid()).To(Equal(testNetwork.GetUuid()))
+		})
+		It("when network doesn't exist in Contrail, it creates and returns it", func() {
+			net, err := client.CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(net).ToNot(BeNil())
+			Expect(net.GetNetworkIpamRefs()).To(HaveLen(1))
+		})
+		It("when network with a different subnet already exists in Contrail, returns error", func() {
+			otherCIDR := "5.6.7.8/24"
+			Expect(subnetCIDR).ToNot(Equal(otherCIDR)) // sanity check
+			CreateTestNetworkWithSubnet(client.ApiClient, networkName, otherCIDR, project)
+
+			net, err := client.CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR)
+
+			Expect(err).To(HaveOccurred())
+			Expect(net).To(BeNil())
+		})
+		It("when network without a subnet already exists in Contrail, returns error", func() {
+			CreateTestNetwork(client.ApiClient, networkName, project)
+
+			net, err := client.CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR)
+
+			Expect(err).To(HaveOccurred())
+			Expect(net).To(BeNil())
+		})
+	})
+
 	Describe("getting Contrail subnet info", func() {
 		assertGettingSubnetFails := func(getTestedNet func() *types.VirtualNetwork,
 			CIDR string) func() {
