@@ -16,14 +16,30 @@
 // Implemented according to
 // https://github.com/docker/libnetwork/blob/master/docs/remote.md
 
-package ports
+package model
 
-import "net"
+import (
+	"net"
+)
 
-type ContrailContainer struct {
+type Container struct {
 	IP        net.IP
 	PrefixLen int
 	Mac       string
+	Gateway   string
 	VmUUID    string
 	VmiUUID   string
+	NetUUID   string
+}
+
+type Network struct {
+	TenantName  string
+	NetworkName string
+	SubnetCIDR  string
+	LocalID     string
+}
+
+type LocalEndpoint struct {
+	IfName string
+	Name   string
 }

@@ -18,6 +18,7 @@ package simulator
 import (
 	"errors"
 
+	"github.com/Juniper/contrail-windows-docker-driver/core/model"
 	"github.com/Microsoft/hcsshim"
 )
 
@@ -31,9 +32,12 @@ func NewInMemEndpointRepository() *InMemEndpointRepository {
 	}
 }
 
-func (repo *InMemEndpointRepository) CreateEndpoint(configuration *hcsshim.HNSEndpoint) (string, error) {
-	repo.endpoints[configuration.Name] = *configuration
-	return configuration.Id, nil
+func (repo *InMemEndpointRepository) CreateEndpoint(name string, container *model.Container, network *model.Network) (string, error) {
+	repo.endpoints[name] = hcsshim.HNSEndpoint{
+		Id:   "123",
+		Name: name,
+	}
+	return "123", nil
 }
 
 func (repo *InMemEndpointRepository) GetEndpointByName(name string) (*hcsshim.HNSEndpoint, error) {

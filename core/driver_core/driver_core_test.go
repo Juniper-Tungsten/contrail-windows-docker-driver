@@ -44,6 +44,8 @@ const (
 	networkName       = "test_net"
 	securityGroupName = "default"
 	subnetCIDR        = "1.2.3.0/24"
+	dockerNetID       = "1234dnID"
+	endpointID        = "5678epID"
 )
 
 func TestCore(t *testing.T) {
@@ -69,14 +71,14 @@ var _ = Describe("Core tests", func() {
 			_ = testNetwork(controller)
 		})
 		It("responds with nil", func() {
-			err := testedCore.CreateNetwork(tenantName, networkName, subnetCIDR)
+			err := testedCore.CreateNetwork(dockerNetID, tenantName, networkName, subnetCIDR)
 			Expect(err).ToNot(HaveOccurred())
 		})
 		It("creates a local Contrail network", func() {
 			netsBefore, err := localNetRepo.ListNetworks()
 			Expect(err).ToNot(HaveOccurred())
 
-			err = testedCore.CreateNetwork(tenantName, networkName, subnetCIDR)
+			err = testedCore.CreateNetwork(dockerNetID, tenantName, networkName, subnetCIDR)
 
 			Expect(err).ToNot(HaveOccurred())
 			netsAfter, err := localNetRepo.ListNetworks()
@@ -90,7 +92,7 @@ var _ = Describe("Core tests", func() {
 		}
 		DescribeTable("using resources that don't exist in Controller",
 			func(t TestCase) {
-				err := testedCore.CreateNetwork(t.tenant, t.network, subnetCIDR)
+				err := testedCore.CreateNetwork(dockerNetID, t.tenant, t.network, subnetCIDR)
 				Expect(err).To(HaveOccurred())
 			},
 			Entry("no such subnet resource", TestCase{
@@ -104,7 +106,85 @@ var _ = Describe("Core tests", func() {
 		)
 	})
 
+	setupControllerNetworkAndLocalNetwork := func() {
+		_ = testProject(controller)
+		_ = testNetwork(controller)
+		err := testedCore.CreateNetwork(dockerNetID, tenantName, networkName, subnetCIDR)
+		Expect(err).ToNot(HaveOccurred())
+	}
+	setupControllerNetworkWithoutLocalNetwork := func() {
+		_ = testProject(controller)
+		_ = testNetwork(controller)
+	}
+	setupLocalNetworkWithoutControllerNetwork := func() {
+		someGateway := "1.2.3.1"
+		err := localNetRepo.CreateNetwork(dockerNetID, tenantName, networkName, subnetCIDR, someGateway)
+		Expect(err).ToNot(HaveOccurred())
+	}
+
 	Context("DeleteNetwork", func() {
+
+		assertErrors := func() {
+			err := testedCore.DeleteNetwork(dockerNetID)
+			Expect(err).To(HaveOccurred())
+		}
+		assertDoesNotError := func() {
+			err := testedCore.DeleteNetwork(dockerNetID)
+			Expect(err).ToNot(HaveOccurred())
+		}
+		assertRemovesLocalNetwork := func() {
+			_ = testedCore.DeleteNetwork(dockerNetID)
+
+			netsAfter, err := localNetRepo.ListNetworks()
+			Expect(err).ToNot(HaveOccurred())
+			Expect(netsAfter).To(HaveLen(0))
+		}
+		assertDoesNotRemoveControllerNetwork := func() {
+			_ = testedCore.DeleteNetwork(dockerNetID)
+			net, subnet, err := controller.GetNetworkWithSubnet(tenantName, networkName, subnetCIDR)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(net).ToNot(BeNil())
+			Expect(subnet).ToNot(BeNil())
+		}
+		Context("Controller network and local network exist", func() {
+			BeforeEach(setupControllerNetworkAndLocalNetwork)
+			It("does not error", assertDoesNotError)
+			It("removes local network", assertRemovesLocalNetwork)
+			It("doesn't remove Controller network", assertDoesNotRemoveControllerNetwork)
+		})
+		Context("Controller network exists, but local network does not exist", func() {
+			BeforeEach(setupControllerNetworkWithoutLocalNetwork)
+			It("errors", assertErrors)
+			It("doesn't remove Controller network", assertDoesNotRemoveControllerNetwork)
+		})
+		Context("Controller network does not exist, but local network does", func() {
+			BeforeEach(setupLocalNetworkWithoutControllerNetwork)
+			It("does not error", assertDoesNotError)
+			It("removes local network", assertRemovesLocalNetwork)
+		})
+		PContext("network has active endpoints", func() {
+			// TODO: marked as pending, because simulator doesn't check for active endpoints yet.
+			// "actual" HNS implementation uses global HNS state to retreive the list of
+			// endpoints. To do such thing in simulator, we would have to pass
+			// InMemEndpointRepository repository to InMemContrailNetworksRepository or
+			// refactor them in some way. Let's defer such refactor to when refactoring
+			// DeleteEndpoint request.
+			BeforeEach(func() {
+				setupControllerNetworkAndLocalNetwork()
+				_, err := testedCore.CreateEndpoint(dockerNetID, endpointID)
+				Expect(err).ToNot(HaveOccurred())
+			})
+			It("errors", assertErrors)
+			It("does not remove local network", func() {
+				err := testedCore.DeleteNetwork(dockerNetID)
+				Expect(err).To(HaveOccurred())
+
+				netsAfter, err := localNetRepo.ListNetworks()
+				Expect(err).ToNot(HaveOccurred())
+				Expect(netsAfter).To(HaveLen(1))
+			})
+		})
 	})
 
 	Context("CreateEndpoint", func() {
@@ -122,20 +202,8 @@ var _ = Describe("Core tests", func() {
 			server.Close()
 		})
 
-		endpointID := "1234"
-
 		Context("Controller network and local network exist", func() {
-			BeforeEach(func() {
-				_ = testProject(controller)
-				_ = testNetwork(controller)
-				err := testedCore.CreateNetwork(tenantName, networkName, subnetCIDR)
-				Expect(err).ToNot(HaveOccurred())
-
-				server.AppendHandlers(
-					ghttp.VerifyRequest("POST", "/port"),
-					ghttp.RespondWith(http.StatusOK, ""),
-				)
-			})
+			BeforeEach(setupControllerNetworkAndLocalNetwork)
 			AfterEach(func() {
 				// Because right now port request is send asynchronously in a goroutine, we need to
 				// wait after each test case for any requests before moving onto the next test case.
@@ -147,7 +215,7 @@ var _ = Describe("Core tests", func() {
 				}).Should(HaveLen(1))
 			})
 			It("returns container resource allocated in controller", func() {
-				container, err := testedCore.CreateEndpoint(tenantName, networkName, subnetCIDR, endpointID)
+				container, err := testedCore.CreateEndpoint(dockerNetID, endpointID)
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(container.IP).To(MatchRegexp(`1.2.3.[0-9]+`))
@@ -157,7 +225,7 @@ var _ = Describe("Core tests", func() {
 				Expect(container.VmiUUID).ToNot(Equal(""))
 			})
 			It("configures HNS endpoint", func() {
-				_, err := testedCore.CreateEndpoint(tenantName, networkName, subnetCIDR, endpointID)
+				_, err := testedCore.CreateEndpoint(dockerNetID, endpointID)
 				Expect(err).ToNot(HaveOccurred())
 
 				ep, err := localEpRepo.GetEndpointByName(endpointID)
@@ -168,17 +236,17 @@ var _ = Describe("Core tests", func() {
 		})
 
 		assertErrors := func() {
-			container, err := testedCore.CreateEndpoint(tenantName, networkName, subnetCIDR, endpointID)
+			container, err := testedCore.CreateEndpoint(dockerNetID, endpointID)
 			Expect(err).To(HaveOccurred())
 			Expect(container).To(BeNil())
 		}
 		assertDoesNotAllocate := func() {
-			container, err := testedCore.CreateEndpoint(tenantName, networkName, subnetCIDR, endpointID)
+			container, err := testedCore.CreateEndpoint(dockerNetID, endpointID)
 			Expect(err).To(HaveOccurred())
 			Expect(container).To(BeNil())
 		}
 		assertDoesNotConfigure := func() {
-			_, err := testedCore.CreateEndpoint(tenantName, networkName, subnetCIDR, endpointID)
+			_, err := testedCore.CreateEndpoint(dockerNetID, endpointID)
 			Expect(err).To(HaveOccurred())
 
 			ep, err := localEpRepo.GetEndpointByName(endpointID)
@@ -195,23 +263,15 @@ var _ = Describe("Core tests", func() {
 				return server.ReceivedRequests()
 			}).Should(HaveLen(0))
 		}
-		Context("Contrail network exists, but local network does not exist", func() {
-			BeforeEach(func() {
-				_ = testProject(controller)
-				_ = testNetwork(controller)
-			})
+		Context("Controller network exists, but local network does not exist", func() {
+			BeforeEach(setupControllerNetworkWithoutLocalNetwork)
 			AfterEach(assertAfterEachDoesNotNotify)
 			It("errors", assertErrors)
 			It("doesn't allocate resources in controller", assertDoesNotAllocate)
 			It("doesn't configure HNS endpoint", assertDoesNotConfigure)
-
 		})
-		Context("Contrail network does not exist, but local network does", func() {
-			BeforeEach(func() {
-				someGateway := "1.2.3.1"
-				_, err := localNetRepo.CreateNetwork(tenantName, networkName, subnetCIDR, someGateway)
-				Expect(err).ToNot(HaveOccurred())
-			})
+		Context("Controller network does not exist, but local network does", func() {
+			BeforeEach(setupLocalNetworkWithoutControllerNetwork)
 			AfterEach(assertAfterEachDoesNotNotify)
 			It("errors", assertErrors)
 			It("doesn't allocate resources in controller", assertDoesNotAllocate)

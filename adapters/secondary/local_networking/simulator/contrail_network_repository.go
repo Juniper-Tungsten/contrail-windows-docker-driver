@@ -19,57 +19,83 @@ import (
 	// We should rely on some kind of domain objects in the future - not hcsshim structs
 	// everywhere.
 	"errors"
-	"fmt"
 
-	"github.com/Juniper/contrail-windows-docker-driver/common"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns"
+	"github.com/Juniper/contrail-windows-docker-driver/core/model"
 	"github.com/Microsoft/hcsshim"
 )
 
 type InMemContrailNetworksRepository struct {
-	networks map[string]hcsshim.HNSNetwork
+	networks     map[string]hcsshim.HNSNetwork
+	associations hns.HNSDBNetworkAssociationMechanism
 }
 
 func NewInMemContrailNetworksRepository() *InMemContrailNetworksRepository {
 	return &InMemContrailNetworksRepository{
-		networks: make(map[string]hcsshim.HNSNetwork),
+		networks:     make(map[string]hcsshim.HNSNetwork),
+		associations: hns.HNSDBNetworkAssociationMechanism{},
 	}
 }
 
-func (repo *InMemContrailNetworksRepository) CreateNetwork(tenantName, networkName, subnetCIDR, defaultGW string) (*hcsshim.HNSNetwork, error) {
-	// TODO: not sure wheter we actually need such complicated name generation in a
-	// simulated repository.
-	// TBH, existence of such code in actual repository implementation and a fake suggests
-	// that we're looking at some other object. Some kind of naming policy class maybe?
-	name := fmt.Sprintf("%s:%s:%s:%s", common.HNSNetworkPrefix, tenantName, networkName, subnetCIDR)
+func (repo *InMemContrailNetworksRepository) CreateNetwork(dockerNetID, tenantName, networkName, subnetCIDR, defaultGW string) error {
+	name := repo.associations.GenerateName(dockerNetID, tenantName, networkName, subnetCIDR)
 
 	net := hcsshim.HNSNetwork{Name: name}
-	repo.networks[name] = net
-	return &net, nil
+	repo.networks[dockerNetID] = net
+
+	return nil
 }
 
-func (repo *InMemContrailNetworksRepository) GetNetwork(tenantName, networkName, subnetCIDR string) (*hcsshim.HNSNetwork, error) {
-	nameToLookFor := fmt.Sprintf("%s:%s:%s:%s", common.HNSNetworkPrefix, tenantName, networkName, subnetCIDR)
-	if net, exists := repo.networks[nameToLookFor]; exists {
-		return &net, nil
+func (repo *InMemContrailNetworksRepository) GetNetwork(dockerNetID string) (*model.Network, error) {
+	if net, exists := repo.networks[dockerNetID]; exists {
+		_, foundTenantName, foundNetworkName, foundSubnetCIDR :=
+			repo.associations.SplitName(net.Name)
+		return &model.Network{
+			TenantName:  foundTenantName,
+			NetworkName: foundNetworkName,
+			SubnetCIDR:  foundSubnetCIDR,
+			LocalID:     "123hnsNetID",
+		}, nil
 	} else {
 		return nil, errors.New("network not found")
 	}
 }
 
-func (repo *InMemContrailNetworksRepository) DeleteNetwork(tenantName, networkName, subnetCIDR string) error {
-	nameToLookFor := fmt.Sprintf("%s:%s:%s:%s", common.HNSNetworkPrefix, tenantName, networkName, subnetCIDR)
-	if _, exists := repo.networks[nameToLookFor]; exists {
-		delete(repo.networks, nameToLookFor)
+func (repo *InMemContrailNetworksRepository) DeleteNetwork(dockerNetID string) error {
+	if _, exists := repo.networks[dockerNetID]; exists {
+		delete(repo.networks, dockerNetID)
 		return nil
 	} else {
 		return errors.New("network not found, so couldn't delete it")
 	}
 }
 
-func (repo *InMemContrailNetworksRepository) ListNetworks() ([]hcsshim.HNSNetwork, error) {
-	arr := make([]hcsshim.HNSNetwork, 0, len(repo.networks))
+func (repo *InMemContrailNetworksRepository) ListNetworks() ([]model.Network, error) {
+	arr := make([]model.Network, 0, len(repo.networks))
 	for _, net := range repo.networks {
-		arr = append(arr, net)
+		_, foundTenantName, foundNetworkName, foundSubnetCIDR :=
+			repo.associations.SplitName(net.Name)
+		mnet := model.Network{
+			TenantName:  foundTenantName,
+			NetworkName: foundNetworkName,
+			SubnetCIDR:  foundSubnetCIDR,
+			LocalID:     "123hnsNetID",
+		}
+		arr = append(arr, mnet)
 	}
 	return arr, nil
+}
+
+func (repo *InMemContrailNetworksRepository) FindContrailNetwork(tenantName, networkName,
+	subnetCIDR string) (*model.Network, error) {
+	for _, net := range repo.networks {
+		foundDockerNetID, foundTenantName, foundNetworkName, foundSubnetCIDR :=
+			repo.associations.SplitName(net.Name)
+		if foundTenantName == tenantName &&
+			foundNetworkName == networkName &&
+			foundSubnetCIDR == subnetCIDR {
+			return repo.GetNetwork(foundDockerNetID)
+		}
+	}
+	return nil, errors.New("network not found")
 }

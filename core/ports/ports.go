@@ -20,6 +20,7 @@ import (
 
 	contrail "github.com/Juniper/contrail-go-api"
 	"github.com/Juniper/contrail-go-api/types"
+	"github.com/Juniper/contrail-windows-docker-driver/core/model"
 )
 
 type Agent interface {
@@ -32,16 +33,14 @@ type VRouter interface {
 }
 
 type LocalContrailNetworkRepository interface {
-	CreateNetwork(tenantName, networkName, subnetCIDR, defaultGW string) (*hcsshim.HNSNetwork,
-		error)
-	GetNetwork(tenantName, networkName, subnetCIDR string) (*hcsshim.HNSNetwork,
-		error)
-	DeleteNetwork(tenantName, networkName, subnetCIDR string) error
-	ListNetworks() ([]hcsshim.HNSNetwork, error)
+	CreateNetwork(dockerNetID, tenantName, networkName, subnetCIDR, defaultGW string) error
+	GetNetwork(dockerNetID string) (*model.Network, error)
+	DeleteNetwork(dockerNetID string) error
+	ListNetworks() ([]model.Network, error)
 }
 
 type LocalContrailEndpointRepository interface {
-	CreateEndpoint(configuration *hcsshim.HNSEndpoint) (string, error)
+	CreateEndpoint(name string, container *model.Container, network *model.Network) (string, error)
 	GetEndpointByName(name string) (*hcsshim.HNSEndpoint, error)
 	DeleteEndpoint(endpointID string) error
 }
@@ -51,7 +50,7 @@ type Controller interface {
 	CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, error)
 	GetNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, *types.IpamSubnetType, error)
 
-	CreateContainerInSubnet(tenantName, containerID string, network *types.VirtualNetwork, subnet *types.IpamSubnetType) (*ContrailContainer, error)
+	CreateContainerInSubnet(net *model.Network, containerID string) (*model.Container, error)
 
 	// This method is only used by tests; to remove?
 	NewProject(domain, tenant string) (*types.Project, error)

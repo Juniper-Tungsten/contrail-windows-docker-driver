@@ -16,12 +16,27 @@
 package hns
 
 import (
+	"strings"
+
+	"github.com/Juniper/contrail-windows-docker-driver/core/model"
 	"github.com/Microsoft/hcsshim"
 )
 
 type HNSEndpointRepository struct{}
 
-func (repo *HNSEndpointRepository) CreateEndpoint(configuration *hcsshim.HNSEndpoint) (string, error) {
+func (repo *HNSEndpointRepository) CreateEndpoint(name string, container *model.Container, network *model.Network) (string, error) {
+	// Ensure that MAC address passed to HNS if foramtted in correct way.
+	// Contrail MACs are like 11:22:aa:bb:cc:dd
+	// HNS needs MACs like 11-22-AA-BB-CC-DD
+	containerMac := strings.Replace(strings.ToUpper(container.Mac), ":", "-", -1)
+
+	configuration := &hcsshim.HNSEndpoint{
+		Name:           name,
+		VirtualNetwork: network.LocalID,
+		IPAddress:      container.IP,
+		GatewayAddress: container.Gateway,
+		MacAddress:     containerMac,
+	}
 	return CreateHNSEndpoint(configuration)
 }
 

@@ -17,10 +17,9 @@ package hns
 
 import (
 	"errors"
-	"fmt"
-	"strings"
 
 	"github.com/Juniper/contrail-windows-docker-driver/common"
+	"github.com/Juniper/contrail-windows-docker-driver/core/model"
 	"github.com/Microsoft/hcsshim"
 )
 
@@ -28,13 +27,14 @@ import (
 // It does it by naming the HNS networks in a specific way. The name of HNS network contains
 // Contrail FQ (fully qualified) name as well as subnet CIDR. This guarantees 1-to-1 correspondence
 // of HNS network with a Contrail subnet. Also, it keeps the driver stateless (relevant state is
-// held directly in HNS). An alternative would be to have a local DB (like SQLite) that stores
-// associations.
+// held directly in HNS, using HNSDBNetworkAssociationMechanism). An alternative would be to have
+// a local DB (like SQLite) that stores associations.
 type HNSContrailNetworksRepository struct {
 	// physDataplaneNetAdapter is the name of physical dataplane adapter that we should attach our
 	// Contrail networks to, e.g. Ethernet0. It is NOT the adapter created by HNS (e.g. "HNS
 	// Transparent").
 	physDataplaneNetAdapter common.AdapterName
+	associations            HNSDBNetworkAssociationMechanism
 }
 
 func NewHNSContrailNetworksRepository(physDataplaneNetAdapter common.AdapterName) (*HNSContrailNetworksRepository, error) {
@@ -43,21 +43,18 @@ func NewHNSContrailNetworksRepository(physDataplaneNetAdapter common.AdapterName
 	}
 	return &HNSContrailNetworksRepository{
 		physDataplaneNetAdapter: physDataplaneNetAdapter,
+		associations:            HNSDBNetworkAssociationMechanism{},
 	}, nil
 }
 
-func associationNameForHNSNetworkContrailSubnet(tenant, netName, subnetCIDR string) string {
-	return fmt.Sprintf("%s:%s:%s:%s", common.HNSNetworkPrefix, tenant, netName, subnetCIDR)
-}
+func (repo *HNSContrailNetworksRepository) CreateNetwork(dockerNetID, tenantName, networkName,
+	subnetCIDR, defaultGW string) error {
 
-func (repo *HNSContrailNetworksRepository) CreateNetwork(tenantName, networkName,
-	subnetCIDR, defaultGW string) (*hcsshim.HNSNetwork, error) {
-
-	hnsNetName := associationNameForHNSNetworkContrailSubnet(tenantName, networkName, subnetCIDR)
+	hnsNetName := repo.associations.GenerateName(dockerNetID, tenantName, networkName, subnetCIDR)
 
 	net, err := GetHNSNetworkByName(hnsNetName)
 	if net != nil {
-		return nil, errors.New("Such HNS network already exists")
+		return errors.New("such HNS network already exists")
 	}
 
 	subnets := []hcsshim.Subnet{
@@ -74,34 +71,33 @@ func (repo *HNSContrailNetworksRepository) CreateNetwork(tenantName, networkName
 		Subnets:            subnets,
 	}
 
-	hnsNetworkID, err := CreateHNSNetwork(configuration)
+	_, err = CreateHNSNetwork(configuration)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	hnsNetwork, err := GetHNSNetwork(hnsNetworkID)
-	if err != nil {
-		return nil, err
-	}
-
-	return hnsNetwork, nil
+	return nil
 }
 
-func (repo *HNSContrailNetworksRepository) GetNetwork(tenantName, networkName, subnetCIDR string) (*hcsshim.HNSNetwork,
+func (repo *HNSContrailNetworksRepository) GetNetwork(dockerNetID string) (*model.Network,
 	error) {
-	hnsNetName := associationNameForHNSNetworkContrailSubnet(tenantName, networkName, subnetCIDR)
-	hnsNetwork, err := GetHNSNetworkByName(hnsNetName)
+	hnsNetwork, err := repo.findHNSNetworkByDockerID(dockerNetID)
 	if err != nil {
 		return nil, err
 	}
-	if hnsNetwork == nil {
-		return nil, errors.New("Such HNS network does not exist")
+	_, foundTenantName, foundNetworkName, foundSubnetCIDR :=
+		repo.associations.SplitName(hnsNetwork.Name)
+	net := model.Network{
+		TenantName:  foundTenantName,
+		NetworkName: foundNetworkName,
+		SubnetCIDR:  foundSubnetCIDR,
+		LocalID:     hnsNetwork.Id,
 	}
-	return hnsNetwork, nil
+	return &net, nil
 }
 
-func (repo *HNSContrailNetworksRepository) DeleteNetwork(tenantName, networkName, subnetCIDR string) error {
-	hnsNetwork, err := repo.GetNetwork(tenantName, networkName, subnetCIDR)
+func (repo *HNSContrailNetworksRepository) DeleteNetwork(dockerNetID string) error {
+	hnsNetwork, err := repo.findHNSNetworkByDockerID(dockerNetID)
 	if err != nil {
 		return err
 	}
@@ -112,25 +108,56 @@ func (repo *HNSContrailNetworksRepository) DeleteNetwork(tenantName, networkName
 
 	for _, ep := range endpoints {
 		if ep.VirtualNetworkName == hnsNetwork.Name {
-			return errors.New("Cannot delete network with active endpoints")
+			return errors.New("cannot delete network with active endpoints")
 		}
 	}
 	return DeleteHNSNetwork(hnsNetwork.Id)
 }
 
-func (repo *HNSContrailNetworksRepository) ListNetworks() ([]hcsshim.HNSNetwork, error) {
-	var validNets []hcsshim.HNSNetwork
-	nets, err := ListHNSNetworks()
+func (repo *HNSContrailNetworksRepository) ListNetworks() ([]model.Network, error) {
+	var ownedNets []model.Network
+	hnsNetworks, err := repo.listOwnedHNSNetworks()
 	if err != nil {
-		return validNets, err
+		return ownedNets, err
 	}
-	for _, net := range nets {
-		splitName := strings.Split(net.Name, ":")
-		if len(splitName) == 4 {
-			if splitName[0] == common.HNSNetworkPrefix {
-				validNets = append(validNets, net)
-			}
+	for _, hnsNetwork := range hnsNetworks {
+		_, foundTenantName, foundNetworkName, foundSubnetCIDR :=
+			repo.associations.SplitName(hnsNetwork.Name)
+		net := model.Network{
+			TenantName:  foundTenantName,
+			NetworkName: foundNetworkName,
+			SubnetCIDR:  foundSubnetCIDR,
+			LocalID:     hnsNetwork.Id,
+		}
+		ownedNets = append(ownedNets, net)
+	}
+	return ownedNets, nil
+}
+
+func (repo *HNSContrailNetworksRepository) findHNSNetworkByDockerID(dockerNetID string) (*hcsshim.HNSNetwork, error) {
+	hnsNetworks, err := repo.listOwnedHNSNetworks()
+	if err != nil {
+		return nil, err
+	}
+	for idx, hnsNetwork := range hnsNetworks {
+		foundDockerNetID, _, _, _ := repo.associations.SplitName(hnsNetwork.Name)
+		if foundDockerNetID == dockerNetID {
+			return &hnsNetworks[idx], nil
 		}
 	}
-	return validNets, nil
+	return nil, errors.New("could not find HNS network with such docker network ID")
+}
+
+func (repo *HNSContrailNetworksRepository) listOwnedHNSNetworks() ([]hcsshim.HNSNetwork, error) {
+	var ownedHNSNetworks []hcsshim.HNSNetwork
+	hnsNetworks, err := ListHNSNetworks()
+	if err != nil {
+		return ownedHNSNetworks, err
+	}
+	for idx, hnsNetwork := range hnsNetworks {
+		if repo.associations.IsOwnedByDriver(hnsNetwork.Name) {
+			ownedHNSNetworks = append(ownedHNSNetworks, hnsNetworks[idx])
+		}
+	}
+	return ownedHNSNetworks, nil
 }

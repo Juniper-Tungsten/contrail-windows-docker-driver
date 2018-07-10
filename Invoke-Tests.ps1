@@ -1,7 +1,7 @@
 param([switch] $RunIntegrationTests)
 
 Write-Host "Running docker driver unit tests..."
-go test -coverpkg=./... -covermode count -coverprofile="cover_unit.out" -tags unit .
+go test -coverpkg=./... -covermode count -coverprofile="cover_unit.out" -tags unit . -- ginkgo.trace
 
 if ($RunIntegrationTests) {
     Write-Host "Running docker driver integration tests..."
