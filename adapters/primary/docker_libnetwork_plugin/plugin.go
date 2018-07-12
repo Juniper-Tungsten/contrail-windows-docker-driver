@@ -39,7 +39,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type DockerPluginServer struct {
+type ServerCNM struct {
 	// TODO: for now, Core field is public, because we need to access its fields, like controller.
 	// This should be made private when making the Controller port smaller.
 	Core *driver_core.ContrailDriverCore
@@ -58,8 +58,8 @@ type NetworkMeta struct {
 	subnetCIDR string
 }
 
-func NewDockerPluginServer(core *driver_core.ContrailDriverCore) *DockerPluginServer {
-	d := &DockerPluginServer{
+func NewServerCNM(core *driver_core.ContrailDriverCore) *ServerCNM {
+	d := &ServerCNM{
 		Core:               core,
 		PipeAddr:           "//./pipe/" + common.DriverName,
 		stopReasonChan:     make(chan error, 1),
@@ -69,7 +69,7 @@ func NewDockerPluginServer(core *driver_core.ContrailDriverCore) *DockerPluginSe
 	return d
 }
 
-func (d *DockerPluginServer) StartServing() error {
+func (d *ServerCNM) StartServing() error {
 
 	if d.IsServing {
 		return errors.New("Already serving.")
@@ -162,7 +162,7 @@ func (d *DockerPluginServer) StartServing() error {
 	}
 }
 
-func (d *DockerPluginServer) StopServing() error {
+func (d *ServerCNM) StopServing() error {
 	if d.IsServing {
 		d.stopReasonChan <- nil
 		<-d.stoppedServingChan
@@ -172,14 +172,14 @@ func (d *DockerPluginServer) StopServing() error {
 	return nil
 }
 
-func (d *DockerPluginServer) GetCapabilities() (*network.CapabilitiesResponse, error) {
+func (d *ServerCNM) GetCapabilities() (*network.CapabilitiesResponse, error) {
 	log.Debugln("=== GetCapabilities")
 	r := &network.CapabilitiesResponse{}
 	r.Scope = network.LocalScope
 	return r, nil
 }
 
-func (d *DockerPluginServer) CreateNetwork(req *network.CreateNetworkRequest) error {
+func (d *ServerCNM) CreateNetwork(req *network.CreateNetworkRequest) error {
 	log.Debugln("=== CreateNetwork")
 	log.Debugln("network.NetworkID =", req.NetworkID)
 	log.Debugln(req)
@@ -228,7 +228,7 @@ func (d *DockerPluginServer) CreateNetwork(req *network.CreateNetworkRequest) er
 	return d.Core.CreateNetwork(req.NetworkID, tenantName, networkName, subnetCIDR)
 }
 
-func (d *DockerPluginServer) AllocateNetwork(req *network.AllocateNetworkRequest) (
+func (d *ServerCNM) AllocateNetwork(req *network.AllocateNetworkRequest) (
 	*network.AllocateNetworkResponse, error) {
 	log.Debugln("=== AllocateNetwork")
 	log.Debugln(req)
@@ -236,21 +236,21 @@ func (d *DockerPluginServer) AllocateNetwork(req *network.AllocateNetworkRequest
 	return nil, errors.New("AllocateNetwork is not implemented")
 }
 
-func (d *DockerPluginServer) DeleteNetwork(req *network.DeleteNetworkRequest) error {
+func (d *ServerCNM) DeleteNetwork(req *network.DeleteNetworkRequest) error {
 	log.Debugln("=== DeleteNetwork")
 	log.Debugln(req)
 
 	return d.Core.DeleteNetwork(req.NetworkID)
 }
 
-func (d *DockerPluginServer) FreeNetwork(req *network.FreeNetworkRequest) error {
+func (d *ServerCNM) FreeNetwork(req *network.FreeNetworkRequest) error {
 	log.Debugln("=== FreeNetwork")
 	log.Debugln(req)
 	// This method is used in swarm, in remote plugins. We don't implement it.
 	return errors.New("FreeNetwork is not implemented")
 }
 
-func (d *DockerPluginServer) CreateEndpoint(req *network.CreateEndpointRequest) (
+func (d *ServerCNM) CreateEndpoint(req *network.CreateEndpointRequest) (
 	*network.CreateEndpointResponse, error) {
 	log.Debugln("=== CreateEndpoint")
 	log.Debugln(req)
@@ -276,7 +276,7 @@ func (d *DockerPluginServer) CreateEndpoint(req *network.CreateEndpointRequest) 
 	return r, nil
 }
 
-func (d *DockerPluginServer) DeleteEndpoint(req *network.DeleteEndpointRequest) error {
+func (d *ServerCNM) DeleteEndpoint(req *network.DeleteEndpointRequest) error {
 	log.Debugln("=== DeleteEndpoint")
 	log.Debugln(req)
 
@@ -334,7 +334,7 @@ func (d *DockerPluginServer) DeleteEndpoint(req *network.DeleteEndpointRequest) 
 	return d.Core.LocalContrailEndpointsRepo.DeleteEndpoint(epToDelete.Id)
 }
 
-func (d *DockerPluginServer) EndpointInfo(req *network.InfoRequest) (*network.InfoResponse, error) {
+func (d *ServerCNM) EndpointInfo(req *network.InfoRequest) (*network.InfoResponse, error) {
 	log.Debugln("=== EndpointInfo")
 	log.Debugln(req)
 
@@ -358,7 +358,7 @@ func (d *DockerPluginServer) EndpointInfo(req *network.InfoRequest) (*network.In
 	return r, nil
 }
 
-func (d *DockerPluginServer) Join(req *network.JoinRequest) (*network.JoinResponse, error) {
+func (d *ServerCNM) Join(req *network.JoinRequest) (*network.JoinResponse, error) {
 	log.Debugln("=== Join")
 	log.Debugln(req)
 	log.Debugln("options:")
@@ -382,7 +382,7 @@ func (d *DockerPluginServer) Join(req *network.JoinRequest) (*network.JoinRespon
 	return r, nil
 }
 
-func (d *DockerPluginServer) Leave(req *network.LeaveRequest) error {
+func (d *ServerCNM) Leave(req *network.LeaveRequest) error {
 	log.Debugln("=== Leave")
 	log.Debugln(req)
 
@@ -397,43 +397,43 @@ func (d *DockerPluginServer) Leave(req *network.LeaveRequest) error {
 	return nil
 }
 
-func (d *DockerPluginServer) DiscoverNew(req *network.DiscoveryNotification) error {
+func (d *ServerCNM) DiscoverNew(req *network.DiscoveryNotification) error {
 	log.Debugln("=== DiscoverNew")
 	log.Debugln(req)
 	// We don't care about discovery notifications.
 	return nil
 }
 
-func (d *DockerPluginServer) DiscoverDelete(req *network.DiscoveryNotification) error {
+func (d *ServerCNM) DiscoverDelete(req *network.DiscoveryNotification) error {
 	log.Debugln("=== DiscoverDelete")
 	log.Debugln(req)
 	// We don't care about discovery notifications.
 	return nil
 }
 
-func (d *DockerPluginServer) ProgramExternalConnectivity(
+func (d *ServerCNM) ProgramExternalConnectivity(
 	req *network.ProgramExternalConnectivityRequest) error {
 	log.Debugln("=== ProgramExternalConnectivity")
 	log.Debugln(req)
 	return nil
 }
 
-func (d *DockerPluginServer) RevokeExternalConnectivity(
+func (d *ServerCNM) RevokeExternalConnectivity(
 	req *network.RevokeExternalConnectivityRequest) error {
 	log.Debugln("=== RevokeExternalConnectivity")
 	log.Debugln(req)
 	return nil
 }
 
-func (d *DockerPluginServer) waitForPipeToAppear() error {
+func (d *ServerCNM) waitForPipeToAppear() error {
 	return d.waitForPipe(true)
 }
 
-func (d *DockerPluginServer) waitForPipeToStop() error {
+func (d *ServerCNM) waitForPipeToStop() error {
 	return d.waitForPipe(false)
 }
 
-func (d *DockerPluginServer) waitForPipe(waitUntilExists bool) error {
+func (d *ServerCNM) waitForPipe(waitUntilExists bool) error {
 	timeStarted := time.Now()
 	for {
 		if time.Since(timeStarted) > common.PipePollingTimeout {
@@ -456,7 +456,7 @@ func (d *DockerPluginServer) waitForPipe(waitUntilExists bool) error {
 	return nil
 }
 
-func (d *DockerPluginServer) waitUntilPipeDialable() error {
+func (d *ServerCNM) waitUntilPipeDialable() error {
 	timeStarted := time.Now()
 	for {
 		if time.Since(timeStarted) > common.PipePollingTimeout {
@@ -476,7 +476,7 @@ func (d *DockerPluginServer) waitUntilPipeDialable() error {
 	}
 }
 
-func (d *DockerPluginServer) networkMetaFromDockerNetwork(dockerNetID string) (*NetworkMeta,
+func (d *ServerCNM) networkMetaFromDockerNetwork(dockerNetID string) (*NetworkMeta,
 	error) {
 	docker, err := dockerClient.NewEnvClient()
 	if err != nil {
