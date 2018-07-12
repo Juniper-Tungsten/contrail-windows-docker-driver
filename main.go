@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/primary/docker_libnetwork_plugin"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/primary/cnm"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/auth"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hyperv_extension"
@@ -160,7 +160,7 @@ func (ws *WinService) Execute(args []string, winChangeReqChan <-chan svc.ChangeR
 		return
 	}
 
-	d := docker_libnetwork_plugin.NewServerCNM(core)
+	d := cnm.NewServerCNM(core)
 	if err = d.StartServing(); err != nil {
 		log.Error(err)
 		return

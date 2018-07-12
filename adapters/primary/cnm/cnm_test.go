@@ -14,13 +14,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package docker_libnetwork_plugin_test
+package cnm_test
 
 import (
 	"testing"
 	"time"
 
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/primary/docker_libnetwork_plugin"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/primary/cnm"
 	"github.com/Juniper/contrail-windows-docker-driver/core/driver_core"
 	"github.com/docker/go-plugins-helpers/network"
 	. "github.com/onsi/ginkgo"
@@ -35,7 +35,7 @@ func TestDriver(t *testing.T) {
 		[]Reporter{junitReporter})
 }
 
-var server *docker_libnetwork_plugin.ServerCNM
+var server *cnm.ServerCNM
 
 const (
 	tenantName  = "agatka"
@@ -74,7 +74,7 @@ var _ = Describe("On requests from docker daemon", func() {
 			// These functions shouldn't use core logic in any way, so let's just pass an empty
 			// structure.
 			nullCore := driver_core.ContrailDriverCore{}
-			server = docker_libnetwork_plugin.NewServerCNM(&nullCore)
+			server = cnm.NewServerCNM(&nullCore)
 		})
 		Context("on GetCapabilities request", func() {
 			It("returns local scope CapabilitiesResponse, nil", func() {

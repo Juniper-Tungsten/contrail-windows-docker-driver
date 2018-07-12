@@ -16,7 +16,7 @@
 // Implemented according to
 // https://github.com/docker/libnetwork/blob/master/docs/remote.md
 
-package docker_libnetwork_plugin
+package cnm
 
 import (
 	"errors"

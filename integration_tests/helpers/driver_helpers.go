@@ -21,7 +21,7 @@ import (
 	"net/url"
 
 	"github.com/Juniper/contrail-go-api/types"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/primary/docker_libnetwork_plugin"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/primary/cnm"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hyperv_extension"
 	netSim "github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/simulator"
@@ -40,7 +40,7 @@ const (
 	DefaultGW   = "1.2.3.1"
 )
 
-func NewIntegrationModulesUnderTest() (vr ports.VRouter, d *docker_libnetwork_plugin.ServerCNM, c ports.Controller, netRepo ports.LocalContrailNetworkRepository, p *types.Project) {
+func NewIntegrationModulesUnderTest() (vr ports.VRouter, d *cnm.ServerCNM, c ports.Controller, netRepo ports.LocalContrailNetworkRepository, p *types.Project) {
 	var err error
 
 	ext := &hyperv_extension.HyperVExtensionSimulator{
@@ -61,7 +61,7 @@ func NewIntegrationModulesUnderTest() (vr ports.VRouter, d *docker_libnetwork_pl
 
 	driverCore, err := driver_core.NewContrailDriverCore(vr, c, a, netRepo, epRepo)
 	Expect(err).ToNot(HaveOccurred())
-	d = docker_libnetwork_plugin.NewServerCNM(driverCore)
+	d = cnm.NewServerCNM(driverCore)
 
 	return
 }

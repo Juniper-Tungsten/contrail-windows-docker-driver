@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package docker_libnetwork_plugin_integration_test
+package cnm_integration_test
 
 import (
 	"context"
@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/Juniper/contrail-go-api/types"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/primary/docker_libnetwork_plugin"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/primary/cnm"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns/win_networking"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/core/ports"
@@ -68,7 +68,7 @@ func TestDockerPlugin(t *testing.T) {
 var _ = Describe("Contrail Docker Libnetwork Plugin registering and listening", func() {
 	var fakeVRouter ports.VRouter
 	var contrailController ports.Controller
-	var server *docker_libnetwork_plugin.ServerCNM
+	var server *cnm.ServerCNM
 	var localContrailNetworksRepo ports.LocalContrailNetworkRepository
 	var project *types.Project
 
