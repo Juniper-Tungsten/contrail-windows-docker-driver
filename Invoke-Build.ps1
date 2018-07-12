@@ -27,7 +27,7 @@ if (-not $SkipMSI) {
     Write-Host "** Building .MSI..."
     go-msi make --arch x64 --version 0.1 --keep `
         --msi (Join-Path $OutDir "docker-driver.msi") `
-        --path "./wix_new.json" `
+        --path "./wix.json" `
         --src "./template" `
         --license "./LICENSE_MSI.txt" `
         --out (Join-Path $OutDir "gomsi")
