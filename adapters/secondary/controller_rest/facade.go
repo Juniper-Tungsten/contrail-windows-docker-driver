@@ -16,11 +16,12 @@
 package controller_rest
 
 import (
+	"errors"
 	"net"
 
 	contrail "github.com/Juniper/contrail-go-api"
 	"github.com/Juniper/contrail-go-api/types"
-	"github.com/Juniper/contrail-windows-docker-driver/core/ports"
+	"github.com/Juniper/contrail-windows-docker-driver/core/model"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -69,10 +70,14 @@ func (c *ControllerAdapter) GetDefaultGatewayIp(ipamSubnet *types.IpamSubnetType
 	return c.controller.GetDefaultGatewayIp(ipamSubnet)
 }
 
-func (c *ControllerAdapter) CreateContainerInSubnet(tenantName, containerID string,
-	network *types.VirtualNetwork, ipamSubnet *types.IpamSubnetType) (*ports.ContrailContainer, error) {
+func (c *ControllerAdapter) CreateContainerInSubnet(network *model.Network, containerID string) (*model.Container, error) {
 
-	vif, err := c.controller.GetOrCreateInterface(network, tenantName, containerID)
+	retreivedNetwork, ipamSubnet, err := c.GetNetworkWithSubnet(network.TenantName, network.NetworkName, network.SubnetCIDR)
+	if err != nil {
+		return nil, err
+	}
+
+	vif, err := c.controller.GetOrCreateInterface(retreivedNetwork, network.TenantName, containerID)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +87,7 @@ func (c *ControllerAdapter) CreateContainerInSubnet(tenantName, containerID stri
 		return nil, err
 	}
 
-	ipobj, err := c.controller.GetOrCreateInstanceIp(network, vif, ipamSubnet.SubnetUuid)
+	ipobj, err := c.controller.GetOrCreateInstanceIp(retreivedNetwork, vif, ipamSubnet.SubnetUuid)
 	if err != nil {
 		return nil, err
 	}
@@ -95,12 +100,19 @@ func (c *ControllerAdapter) CreateContainerInSubnet(tenantName, containerID stri
 		return nil, err
 	}
 
-	container := &ports.ContrailContainer{
+	gateway := ipamSubnet.DefaultGateway
+	if gateway == "" {
+		return nil, errors.New("Default GW is empty")
+	}
+
+	container := &model.Container{
 		IP:        net.ParseIP(ip),
 		PrefixLen: ipamSubnet.Subnet.IpPrefixLen,
 		Mac:       mac,
+		Gateway:   gateway,
 		VmUUID:    vm.GetUuid(),
 		VmiUUID:   vif.GetUuid(),
+		NetUUID:   retreivedNetwork.GetUuid(),
 	}
 
 	return container, nil

@@ -24,7 +24,6 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"strings"
 	"time"
 
 	"context"
@@ -226,7 +225,7 @@ func (d *DockerPluginServer) CreateNetwork(req *network.CreateNetworkRequest) er
 	tenantName := tenant.(string)
 	networkName := netName.(string)
 
-	return d.Core.CreateNetwork(tenantName, networkName, subnetCIDR)
+	return d.Core.CreateNetwork(req.NetworkID, tenantName, networkName, subnetCIDR)
 }
 
 func (d *DockerPluginServer) AllocateNetwork(req *network.AllocateNetworkRequest) (
@@ -241,49 +240,7 @@ func (d *DockerPluginServer) DeleteNetwork(req *network.DeleteNetworkRequest) er
 	log.Debugln("=== DeleteNetwork")
 	log.Debugln(req)
 
-	dockerNetsMeta, err := d.dockerNetworksMeta()
-	log.Debugln("Current docker-Contrail networks meta", dockerNetsMeta)
-	if err != nil {
-		return err
-	}
-
-	hnsNetsMeta, err := d.hnsNetworksMeta()
-	log.Debugln("Current HNS-Contrail networks meta", hnsNetsMeta)
-	if err != nil {
-		return err
-	}
-
-	// this piece of code goes through ALL docker and HNS networks, looking for
-	// ones that match (based on uniquely defining metadata - tenant, network and subnet CIDR).
-	// If it doesn't find a match for a HNS network (that is: HNS network exists, but corresponding
-	// docker network doesn't), it will remove it.
-	// POSSIBLE BUG: current implementation will remove the last encountered unmatched HNS net.
-	// * what if there are many unmatched HNS networks? Should we remove all of them?
-	// AFAIR we cannot use NetworkID from request from docker driver and retreive docker
-	// network metadata, because the network already doesn't exist in docker DB.
-	// TODO: refactor into a separate Docker-HNS sync mechanism.
-	var toRemove *NetworkMeta
-	toRemove = nil
-	for _, hnsMeta := range hnsNetsMeta {
-		matchFound := false
-		for _, dockerMeta := range dockerNetsMeta {
-			if dockerMeta.tenant == hnsMeta.tenant && dockerMeta.network == hnsMeta.network &&
-				dockerMeta.subnetCIDR == hnsMeta.subnetCIDR {
-				matchFound = true
-				break
-			}
-		}
-		if !matchFound {
-			toRemove = &hnsMeta
-			break
-		}
-	}
-
-	if toRemove == nil {
-		return errors.New("During handling of DeleteNetwork, couldn't find net to remove")
-	}
-
-	return d.Core.DeleteNetwork(toRemove.tenant, toRemove.network, toRemove.subnetCIDR)
+	return d.Core.DeleteNetwork(req.NetworkID)
 }
 
 func (d *DockerPluginServer) FreeNetwork(req *network.FreeNetworkRequest) error {
@@ -304,12 +261,7 @@ func (d *DockerPluginServer) CreateEndpoint(req *network.CreateEndpointRequest) 
 		fmt.Printf("%v: %v\n", k, v)
 	}
 
-	meta, err := d.networkMetaFromDockerNetwork(req.NetworkID)
-	if err != nil {
-		return nil, err
-	}
-
-	container, err := d.Core.CreateEndpoint(meta.tenant, meta.network, meta.subnetCIDR, req.EndpointID)
+	container, err := d.Core.CreateEndpoint(req.NetworkID, req.EndpointID)
 	if err != nil {
 		return nil, err
 	}
@@ -333,6 +285,8 @@ func (d *DockerPluginServer) DeleteEndpoint(req *network.DeleteEndpointRequest) 
 	// containerID := req.Options["vmname"]
 	containerID := req.EndpointID
 
+	// TODO: remove this function and call, so that we don't have to rely on network meta from
+	// docker. We want pure CNM plugin, not one that relies on docker running on local host.
 	meta, err := d.networkMetaFromDockerNetwork(req.NetworkID)
 	if err != nil {
 		return err
@@ -563,53 +517,4 @@ func (d *DockerPluginServer) networkMetaFromDockerNetwork(dockerNetID string) (*
 	meta.subnetCIDR = ipamCfg[0].Subnet
 
 	return &meta, nil
-}
-
-func (d *DockerPluginServer) dockerNetworksMeta() ([]NetworkMeta, error) {
-	var meta []NetworkMeta
-
-	docker, err := dockerClient.NewEnvClient()
-	if err != nil {
-		return nil, err
-	}
-
-	netList, err := docker.NetworkList(context.Background(), dockerTypes.NetworkListOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	for _, net := range netList {
-		tenantContrail, tenantExists := net.Options["tenant"]
-		networkContrail, networkExists := net.Options["network"]
-		if tenantExists && networkExists {
-			meta = append(meta, NetworkMeta{
-				tenant:     tenantContrail,
-				network:    networkContrail,
-				subnetCIDR: net.IPAM.Config[0].Subnet,
-			})
-		}
-	}
-	return meta, nil
-}
-
-func (d *DockerPluginServer) hnsNetworksMeta() ([]NetworkMeta, error) {
-	hnsNetworks, err := d.Core.LocalContrailNetworksRepo.ListNetworks()
-	if err != nil {
-		return nil, err
-	}
-
-	var meta []NetworkMeta
-	for _, net := range hnsNetworks {
-		splitName := strings.Split(net.Name, ":")
-		// hnsManager.ListNetworks() already sanitizes network name
-		tenantName := splitName[1]
-		networkName := splitName[2]
-		subnetCIDR := splitName[3]
-		meta = append(meta, NetworkMeta{
-			tenant:     tenantName,
-			network:    networkName,
-			subnetCIDR: subnetCIDR,
-		})
-	}
-	return meta, nil
 }

@@ -25,11 +25,10 @@ import (
 	"time"
 
 	// TODO: this import should be removed when making Controller port smaller
-	"github.com/Juniper/contrail-go-api/types"
 
 	// TODO: this import should be removed
-	"github.com/Microsoft/hcsshim"
 
+	"github.com/Juniper/contrail-windows-docker-driver/core/model"
 	"github.com/Juniper/contrail-windows-docker-driver/core/ports"
 	log "github.com/sirupsen/logrus"
 )
@@ -68,7 +67,7 @@ func (core *ContrailDriverCore) initializeAdapters() error {
 	return core.vrouter.Initialize()
 }
 
-func (core *ContrailDriverCore) CreateNetwork(tenantName, networkName, subnetCIDR string) error {
+func (core *ContrailDriverCore) CreateNetwork(dockerNetID, tenantName, networkName, subnetCIDR string) error {
 	network, ipamSubnet, err := core.Controller.GetNetworkWithSubnet(tenantName, networkName, subnetCIDR)
 	if err != nil {
 		return err
@@ -88,17 +87,20 @@ func (core *ContrailDriverCore) CreateNetwork(tenantName, networkName, subnetCID
 		log.Warn("Default GW is empty")
 	}
 
-	_, err = core.LocalContrailNetworksRepo.CreateNetwork(tenantName, networkName, subnetCIDR,
+	return core.LocalContrailNetworksRepo.CreateNetwork(dockerNetID, tenantName, networkName, subnetCIDR,
 		gateway)
-
-	return err
 }
 
-func (core *ContrailDriverCore) DeleteNetwork(tenantName, networkName, subnetCIDR string) error {
-	return core.LocalContrailNetworksRepo.DeleteNetwork(tenantName, networkName, subnetCIDR)
+func (core *ContrailDriverCore) DeleteNetwork(dockerNetID string) error {
+	return core.LocalContrailNetworksRepo.DeleteNetwork(dockerNetID)
 }
 
-func (core *ContrailDriverCore) CreateEndpoint(tenantName, networkName, subnetCIDR, endpointID string) (*ports.ContrailContainer, error) {
+func (core *ContrailDriverCore) CreateEndpoint(dockerNetID, endpointID string) (*model.Container, error) {
+
+	network, err := core.LocalContrailNetworksRepo.GetNetwork(dockerNetID)
+	if err != nil {
+		return nil, err
+	}
 
 	// WORKAROUND: We need to retreive Container ID here and use it instead of EndpointID as
 	// argument to GetOrCreateInstance(). EndpointID is equiv to interface, but in Contrail,
@@ -107,49 +109,15 @@ func (core *ContrailDriverCore) CreateEndpoint(tenantName, networkName, subnetCI
 	// containerID := req.Options["vmname"]
 	containerID := endpointID
 
-	network, ipamSubnet, err := core.Controller.GetNetworkWithSubnet(tenantName, networkName, subnetCIDR)
+	container, err := core.Controller.CreateContainerInSubnet(network, containerID)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Infoln(core.Controller.CreateContainerInSubnet(tenantName, containerID, network, ipamSubnet))
-
-	container, err := core.Controller.CreateContainerInSubnet(tenantName, containerID, network, ipamSubnet)
+	localEndpoint, err := core.createContainerEndpointInLocalNetwork(container, network, endpointID)
 	if err != nil {
 		return nil, err
 	}
-
-	// contrail MACs are like 11:22:aa:bb:cc:dd
-	// HNS needs MACs like 11-22-AA-BB-CC-DD
-	formattedMac := strings.Replace(strings.ToUpper(container.Mac), ":", "-", -1)
-
-	hnsNet, err := core.LocalContrailNetworksRepo.GetNetwork(tenantName, networkName, subnetCIDR)
-	if err != nil {
-		return nil, err
-	}
-
-	gateway := ipamSubnet.DefaultGateway
-	if gateway == "" {
-		return nil, errors.New("Default GW is empty")
-	}
-
-	// TODO: We should remove references to hcsshim here - probably by adding a new struct
-	// to core/ports/models.go
-	hnsEndpointConfig := &hcsshim.HNSEndpoint{
-		VirtualNetworkName: hnsNet.Name,
-		Name:               endpointID,
-		IPAddress:          container.IP,
-		MacAddress:         formattedMac,
-		GatewayAddress:     gateway,
-	}
-
-	hnsEndpointID, err := core.LocalContrailEndpointsRepo.CreateEndpoint(hnsEndpointConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: this can be refactored into some nice mechanism.
-	ifName := core.generateFriendlyName(hnsEndpointID)
 
 	go func() {
 		// WORKAROUND: Temporary workaround for HNS issue.
@@ -157,8 +125,7 @@ func (core *ContrailDriverCore) CreateEndpoint(tenantName, networkName, subnetCI
 		// is ready to handle ARP requests. Unfortunately it seems that HNS doesn't have api
 		// to verify if endpoint setup is done
 		time.Sleep(core.hnsEndpointWaitingTime)
-		err := core.Agent.AddPort(container.VmUUID, container.VmiUUID, ifName,
-			container.Mac, containerID, container.IP.String(), network.GetUuid())
+		err := core.associatePort(container, localEndpoint)
 		if err != nil {
 			log.Error(err.Error())
 		}
@@ -166,9 +133,26 @@ func (core *ContrailDriverCore) CreateEndpoint(tenantName, networkName, subnetCI
 	return container, nil
 }
 
-func (core *ContrailDriverCore) GetContrailSubnetCIDR(ipam *types.IpamSubnetType) string {
-	// TODO: this should be probably moved to Controller when we make Controller port smaller.
-	return fmt.Sprintf("%s/%v", ipam.Subnet.IpPrefix, ipam.Subnet.IpPrefixLen)
+func (core *ContrailDriverCore) createContainerEndpointInLocalNetwork(container *model.Container, network *model.Network, name string) (*model.LocalEndpoint, error) {
+
+	hnsEndpointID, err := core.LocalContrailEndpointsRepo.CreateEndpoint(name, container, network)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: this can be refactored into some nice mechanism.
+	ifName := core.generateFriendlyName(hnsEndpointID)
+
+	ep := &model.LocalEndpoint{
+		IfName: ifName,
+		Name:   hnsEndpointID,
+	}
+	return ep, nil
+}
+
+func (core *ContrailDriverCore) associatePort(container *model.Container, ep *model.LocalEndpoint) error {
+	return core.Agent.AddPort(container.VmUUID, container.VmiUUID, ep.IfName,
+		container.Mac, ep.Name, container.IP.String(), container.NetUUID)
 }
 
 func (core *ContrailDriverCore) generateFriendlyName(hnsEndpointID string) string {
