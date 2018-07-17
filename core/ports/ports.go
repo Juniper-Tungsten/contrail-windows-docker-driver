@@ -18,7 +18,6 @@ package ports
 import (
 	"github.com/Microsoft/hcsshim"
 
-	contrail "github.com/Juniper/contrail-go-api"
 	"github.com/Juniper/contrail-go-api/types"
 	"github.com/Juniper/contrail-windows-docker-driver/core/model"
 )
@@ -41,16 +40,16 @@ type LocalContrailNetworkRepository interface {
 
 type LocalContrailEndpointRepository interface {
 	CreateEndpoint(name string, container *model.Container, network *model.Network) (string, error)
-	GetEndpointByName(name string) (*hcsshim.HNSEndpoint, error)
+	GetEndpoint(name string) (*hcsshim.HNSEndpoint, error)
 	DeleteEndpoint(endpointID string) error
 }
 
-// TODO: This interface can be simplified
 type Controller interface {
 	CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, error)
 	GetNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, *types.IpamSubnetType, error)
 
 	CreateContainerInSubnet(net *model.Network, containerID string) (*model.Container, error)
+	DeleteContainer(containerID string) error
 
 	// This method is only used by tests; to remove?
 	NewProject(domain, tenant string) (*types.Project, error)
@@ -59,5 +58,4 @@ type Controller interface {
 	GetNetwork(tenantName, networkName string) (*types.VirtualNetwork, error)
 	GetInstance(containerId string) (*types.VirtualMachine, error)
 	GetExistingInterface(net *types.VirtualNetwork, tenantName, containerId string) (*types.VirtualMachineInterface, error)
-	DeleteElementRecursive(parent contrail.IObject) error
 }

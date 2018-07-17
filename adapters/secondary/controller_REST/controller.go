@@ -19,9 +19,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"regexp"
-	"strings"
 	"strconv"
+	"strings"
 
 	contrail "github.com/Juniper/contrail-go-api"
 	"github.com/Juniper/contrail-go-api/config"
@@ -339,45 +338,58 @@ func (c *ControllerAdapterImpl) GetOrCreateInstanceIp(net *types.VirtualNetwork,
 	return allocatedIP, nil
 }
 
-func (c *ControllerAdapterImpl) DeleteElementRecursive(parent contrail.IObject) error {
-	log.Debugln("Deleting", parent.GetType(), parent.GetUuid())
-	for err := c.ApiClient.Delete(parent); err != nil; err = c.ApiClient.Delete(parent) {
-		if c.isResourceNotFound(err) {
-			log.Errorln("Failed to delete Contrail resource", err.Error())
-			break
-		} else if strings.Contains(err.Error(), "409 Conflict") {
-			msg := err.Error()
-			// example error message when object has children:
-			// `409 Conflict: Delete when children still present:
-			// ['http://10.7.0.54:8082/virtual-network/23e300f4-ab1a-4d97-a1d9-9ed69b601e17']`
+func (c *ControllerAdapterImpl) DeleteContainer(containerID string) error {
+	log.Debugln("Starting delete procedure of container and related resources", containerID)
+	container, err := types.VirtualMachineByName(c.ApiClient, containerID)
+	if err != nil {
+		return err
+	}
 
-			// This regex finds all strings like:
-			// `virtual-network/23e300f4-ab1a-4d97-a1d9-9ed69b601e17`
-			var re *regexp.Regexp
-			re, err = regexp.Compile(
-				"([a-z-]*\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})")
-			if err != nil {
-				return err
-			}
-			found := re.FindAll([]byte(msg), -1)
+	if err := c.removeVMIBackRefsOf(container); err != nil {
+		return err
+	}
 
-			for _, f := range found {
-				split := strings.Split(string(f), "/")
-				typename := split[0]
-				UUID := split[1]
-				var child contrail.IObject
-				child, err = c.ApiClient.FindByUuid(typename, UUID)
-				if err != nil {
-					return err
-				}
-				if child == nil {
-					return errors.New("Child object is nil")
-				}
-				err = c.DeleteElementRecursive(child)
-				if err != nil {
-					return err
-				}
-			}
+	log.Debugln("Deleting virtual-machine", container.GetName(), container.GetUuid())
+	return c.ApiClient.DeleteByUuid("virtual-machine", container.GetUuid())
+}
+
+func (c *ControllerAdapterImpl) removeVMIBackRefsOf(container *types.VirtualMachine) error {
+	vmiRefs, err := container.GetVirtualMachineInterfaceBackRefs()
+	if err != nil {
+		return err
+	}
+	if len(vmiRefs) > 0 {
+		log.Debugln("Container has virtual-machine-interface refs")
+	}
+	for _, vmiRef := range vmiRefs {
+		vmi, err := c.ApiClient.FindByUuid("virtual-machine-interface", vmiRef.Uuid)
+		if err != nil {
+			return err
+		}
+		if err := c.removeInstanceIPBackRefsOf(vmi.(*types.VirtualMachineInterface)); err != nil {
+			return err
+		}
+		log.Debugln("Deleting virtual-machine-interface", vmi.GetUuid())
+		err = c.ApiClient.DeleteByUuid("virtual-machine-interface", vmi.GetUuid())
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *ControllerAdapterImpl) removeInstanceIPBackRefsOf(vmi *types.VirtualMachineInterface) error {
+	iipRefs, err := vmi.GetInstanceIpBackRefs()
+	if err != nil {
+		return err
+	}
+	if len(iipRefs) > 0 {
+		log.Debugln("virtual-machine-interaface has instance-ip refs")
+	}
+	for _, iipRef := range iipRefs {
+		log.Debugln("Deleting instance-ip", iipRef.Uuid)
+		if err := c.ApiClient.DeleteByUuid("instance-ip", iipRef.Uuid); err != nil {
+			return err
 		}
 	}
 	return nil

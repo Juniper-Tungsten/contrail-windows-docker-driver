@@ -26,13 +26,9 @@ import (
 	"os"
 	"time"
 
-	"context"
-
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/core/driver_core"
 	winio "github.com/Microsoft/go-winio"
-	dockerTypes "github.com/docker/docker/api/types"
-	dockerClient "github.com/docker/docker/client"
 	"github.com/docker/go-connections/sockets"
 	"github.com/docker/go-plugins-helpers/network"
 	"github.com/docker/libnetwork/netlabel"
@@ -280,58 +276,7 @@ func (d *ServerCNM) DeleteEndpoint(req *network.DeleteEndpointRequest) error {
 	log.Debugln("=== DeleteEndpoint")
 	log.Debugln(req)
 
-	// TODO JW-187.
-	// We need something like:
-	// containerID := req.Options["vmname"]
-	containerID := req.EndpointID
-
-	// TODO: remove this function and call, so that we don't have to rely on network meta from
-	// docker. We want pure CNM plugin, not one that relies on docker running on local host.
-	meta, err := d.networkMetaFromDockerNetwork(req.NetworkID)
-	if err != nil {
-		return err
-	}
-
-	contrailNetwork, err := d.Core.Controller.GetNetwork(meta.tenant, meta.network)
-	if err != nil {
-		return err
-	}
-	log.Infoln("Retrieved Contrail network:", contrailNetwork.GetUuid())
-
-	contrailVif, err := d.Core.Controller.GetExistingInterface(contrailNetwork, meta.tenant,
-		containerID)
-	if err != nil {
-		log.Warn("When handling DeleteEndpoint, interface wasn't found")
-	} else {
-		go func() {
-			err := d.Core.Agent.DeletePort(contrailVif.GetUuid())
-			if err != nil {
-				log.Error(err.Error())
-			}
-		}()
-	}
-
-	contrailInstance, err := d.Core.Controller.GetInstance(containerID)
-	if err != nil {
-		log.Warn("When handling DeleteEndpoint, Contrail vm instance wasn't found")
-	} else {
-		err = d.Core.Controller.DeleteElementRecursive(contrailInstance)
-		if err != nil {
-			log.Warn("When handling DeleteEndpoint, failed to remove Contrail vm instance")
-		}
-	}
-
-	hnsEpName := req.EndpointID
-	epToDelete, err := d.Core.LocalContrailEndpointsRepo.GetEndpointByName(hnsEpName)
-	if err != nil {
-		return err
-	}
-	if epToDelete == nil {
-		log.Warn("When handling DeleteEndpoint, couldn't find HNS endpoint to delete")
-		return nil
-	}
-
-	return d.Core.LocalContrailEndpointsRepo.DeleteEndpoint(epToDelete.Id)
+	return d.Core.DeleteEndpoint(req.NetworkID, req.EndpointID)
 }
 
 func (d *ServerCNM) EndpointInfo(req *network.InfoRequest) (*network.InfoResponse, error) {
@@ -339,7 +284,7 @@ func (d *ServerCNM) EndpointInfo(req *network.InfoRequest) (*network.InfoRespons
 	log.Debugln(req)
 
 	hnsEpName := req.EndpointID
-	hnsEp, err := d.Core.LocalContrailEndpointsRepo.GetEndpointByName(hnsEpName)
+	hnsEp, err := d.Core.LocalContrailEndpointsRepo.GetEndpoint(hnsEpName)
 	if err != nil {
 		return nil, err
 	}
@@ -366,7 +311,7 @@ func (d *ServerCNM) Join(req *network.JoinRequest) (*network.JoinResponse, error
 		fmt.Printf("%v: %v\n", k, v)
 	}
 
-	hnsEp, err := d.Core.LocalContrailEndpointsRepo.GetEndpointByName(req.EndpointID)
+	hnsEp, err := d.Core.LocalContrailEndpointsRepo.GetEndpoint(req.EndpointID)
 	if err != nil {
 		return nil, err
 	}
@@ -386,7 +331,7 @@ func (d *ServerCNM) Leave(req *network.LeaveRequest) error {
 	log.Debugln("=== Leave")
 	log.Debugln(req)
 
-	hnsEp, err := d.Core.LocalContrailEndpointsRepo.GetEndpointByName(req.EndpointID)
+	hnsEp, err := d.Core.LocalContrailEndpointsRepo.GetEndpoint(req.EndpointID)
 	if err != nil {
 		return err
 	}
@@ -474,42 +419,4 @@ func (d *ServerCNM) waitUntilPipeDialable() error {
 
 		time.Sleep(common.PipePollingRate)
 	}
-}
-
-func (d *ServerCNM) networkMetaFromDockerNetwork(dockerNetID string) (*NetworkMeta,
-	error) {
-	docker, err := dockerClient.NewEnvClient()
-	if err != nil {
-		return nil, err
-	}
-
-	inspectOptions := dockerTypes.NetworkInspectOptions{
-		Scope:   "",
-		Verbose: false,
-	}
-	dockerNetwork, err := docker.NetworkInspect(context.Background(), dockerNetID, inspectOptions)
-	if err != nil {
-		return nil, err
-	}
-
-	var meta NetworkMeta
-	var exists bool
-
-	meta.tenant, exists = dockerNetwork.Options["tenant"]
-	if !exists {
-		return nil, errors.New("Retrieved network has no Contrail tenant specified")
-	}
-
-	meta.network, exists = dockerNetwork.Options["network"]
-	if !exists {
-		return nil, errors.New("Retrieved network has no Contrail network name specfied")
-	}
-
-	ipamCfg := dockerNetwork.IPAM.Config
-	if len(ipamCfg) == 0 {
-		return nil, errors.New("No configured subnets in docker network")
-	}
-	meta.subnetCIDR = ipamCfg[0].Subnet
-
-	return &meta, nil
 }

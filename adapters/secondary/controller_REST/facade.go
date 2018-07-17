@@ -19,7 +19,6 @@ import (
 	"errors"
 	"net"
 
-	contrail "github.com/Juniper/contrail-go-api"
 	"github.com/Juniper/contrail-go-api/types"
 	"github.com/Juniper/contrail-windows-docker-driver/core/model"
 	log "github.com/sirupsen/logrus"
@@ -126,6 +125,6 @@ func (c *ControllerAdapter) GetExistingInterface(net *types.VirtualNetwork, tena
 	return c.controller.GetExistingInterface(net, tenantName, containerId)
 }
 
-func (c *ControllerAdapter) DeleteElementRecursive(parent contrail.IObject) error {
-	return c.controller.DeleteElementRecursive(parent)
+func (c *ControllerAdapter) DeleteContainer(containerID string) error {
+	return c.controller.DeleteContainer(containerID)
 }

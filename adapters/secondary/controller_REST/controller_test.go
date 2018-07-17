@@ -112,10 +112,6 @@ var _ = Describe("ControllerAdapterImpl", func() {
 	})
 
 	Specify("recursive deletion removes elements down the ref tree", func() {
-		if !useActualController {
-			Skip("test fails (pending) when using mocked client")
-		}
-
 		testNetwork := CreateTestNetworkWithSubnet(client.ApiClient, networkName, subnetCIDR,
 			project)
 		testInterface := CreateMockedInterface(client.ApiClient, testNetwork, tenantName,
@@ -124,7 +120,7 @@ var _ = Describe("ControllerAdapterImpl", func() {
 		testInstanceIP := CreateTestInstanceIP(client.ApiClient, tenantName, testInterface,
 			testNetwork)
 
-		err := client.DeleteElementRecursive(testInstance)
+		err := client.DeleteContainer(containerID)
 		Expect(err).ToNot(HaveOccurred())
 
 		_, err = client.ApiClient.FindByUuid(testNetwork.GetType(), testNetwork.GetUuid())

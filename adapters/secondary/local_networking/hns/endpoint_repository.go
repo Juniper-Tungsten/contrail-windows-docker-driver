@@ -40,10 +40,14 @@ func (repo *HNSEndpointRepository) CreateEndpoint(name string, container *model.
 	return CreateHNSEndpoint(configuration)
 }
 
-func (repo *HNSEndpointRepository) GetEndpointByName(name string) (*hcsshim.HNSEndpoint, error) {
+func (repo *HNSEndpointRepository) GetEndpoint(name string) (*hcsshim.HNSEndpoint, error) {
 	return GetHNSEndpointByName(name)
 }
 
-func (repo *HNSEndpointRepository) DeleteEndpoint(endpointID string) error {
-	return DeleteHNSEndpoint(endpointID)
+func (repo *HNSEndpointRepository) DeleteEndpoint(name string) error {
+	ep, err := repo.GetEndpoint(name)
+	if err != nil {
+		return err
+	}
+	return DeleteHNSEndpoint(ep.Id)
 }

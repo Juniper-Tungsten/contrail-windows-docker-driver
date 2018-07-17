@@ -145,6 +145,52 @@ func (core *ContrailDriverCore) associatePort(container *model.Container, ep *mo
 		container.Mac, ep.Name, container.IP.String(), container.NetUUID)
 }
 
+func (core *ContrailDriverCore) DeleteEndpoint(dockerNetID, endpointID string) error {
+
+	network, err := core.LocalContrailNetworksRepo.GetNetwork(dockerNetID)
+	if err != nil {
+		return err
+	}
+
+	contrailNetwork, err := core.Controller.GetNetwork(network.TenantName, network.NetworkName)
+	if err != nil {
+		return err
+	}
+	log.Infoln("Retrieved Contrail network:", contrailNetwork.GetUuid())
+
+	// WORKAROUND: We need to retreive Container ID here and use it instead of EndpointID as
+	// argument to GetOrCreateInstance(). EndpointID is equiv to interface, but in Contrail,
+	// we have a "VirtualMachine" in data model. A single VM can be connected to two or more
+	// overlay networks, but when we use EndpointID, this won't work. We need something like:
+	// containerID := req.Options["vmname"]
+	containerID := endpointID
+
+	contrailVif, err := core.Controller.GetExistingInterface(contrailNetwork,
+		network.TenantName, containerID)
+	if err != nil {
+		return err
+	}
+
+	vifUUID := contrailVif.GetUuid()
+	if err != nil {
+		log.Warn("When handling DeleteEndpoint, interface wasn't found")
+	} else {
+		go func() {
+			err := core.Agent.DeletePort(vifUUID)
+			if err != nil {
+				log.Error(err.Error())
+			}
+		}()
+	}
+
+	err = core.Controller.DeleteContainer(containerID)
+	if err != nil {
+		log.Warn("When handling DeleteEndpoint, failed to remove Contrail vm instance")
+	}
+
+	return core.LocalContrailEndpointsRepo.DeleteEndpoint(endpointID)
+}
+
 func (core *ContrailDriverCore) generateFriendlyName(hnsEndpointID string) string {
 	// Here's how the Forwarding Extension (kernel) can identify interfaces based on their
 	// friendly names.

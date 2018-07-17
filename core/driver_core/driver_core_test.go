@@ -20,6 +20,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"testing"
 
 	"github.com/Juniper/contrail-go-api/types"
@@ -123,7 +124,7 @@ var _ = Describe("Core tests", func() {
 
 	Context("DeleteNetwork", func() {
 
-		assertErrors := func() {
+		assertReturnsError := func() {
 			err := testedCore.DeleteNetwork(dockerNetID)
 			Expect(err).To(HaveOccurred())
 		}
@@ -154,7 +155,7 @@ var _ = Describe("Core tests", func() {
 		})
 		Context("Controller network exists, but local network does not exist", func() {
 			BeforeEach(setupControllerNetworkWithoutLocalNetwork)
-			It("errors", assertErrors)
+			It("returns an error", assertReturnsError)
 			It("doesn't remove Controller network", assertDoesNotRemoveControllerNetwork)
 		})
 		Context("Controller network does not exist, but local network does", func() {
@@ -174,7 +175,7 @@ var _ = Describe("Core tests", func() {
 				_, err := testedCore.CreateEndpoint(dockerNetID, endpointID)
 				Expect(err).ToNot(HaveOccurred())
 			})
-			It("errors", assertErrors)
+			It("returns an error", assertReturnsError)
 			It("does not remove local network", func() {
 				err := testedCore.DeleteNetwork(dockerNetID)
 				Expect(err).To(HaveOccurred())
@@ -208,7 +209,7 @@ var _ = Describe("Core tests", func() {
 				// wait after each test case for any requests before moving onto the next test case.
 				// This is to ensure test isolation. Otherwise, the async request may "spill over" to
 				// the next test case which would be hard to debug.
-				By("notifies port listener")
+				By("notifies port listener about association")
 				Eventually(func() []*http.Request {
 					return server.ReceivedRequests()
 				}).Should(HaveLen(1))
@@ -227,14 +228,14 @@ var _ = Describe("Core tests", func() {
 				_, err := testedCore.CreateEndpoint(dockerNetID, endpointID)
 				Expect(err).ToNot(HaveOccurred())
 
-				ep, err := localEpRepo.GetEndpointByName(endpointID)
+				ep, err := localEpRepo.GetEndpoint(endpointID)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(ep).ToNot(BeNil())
 				Expect(ep.Name).To(Equal(endpointID))
 			})
 		})
 
-		assertErrors := func() {
+		assertReturnsError := func() {
 			container, err := testedCore.CreateEndpoint(dockerNetID, endpointID)
 			Expect(err).To(HaveOccurred())
 			Expect(container).To(BeNil())
@@ -248,37 +249,138 @@ var _ = Describe("Core tests", func() {
 			_, err := testedCore.CreateEndpoint(dockerNetID, endpointID)
 			Expect(err).To(HaveOccurred())
 
-			ep, err := localEpRepo.GetEndpointByName(endpointID)
+			ep, err := localEpRepo.GetEndpoint(endpointID)
 			Expect(err).To(HaveOccurred())
 			Expect(ep).To(BeNil())
 		}
-		assertAfterEachDoesNotNotify := func() {
+		assertAfterEachDoesNotNotifyAboutAssociation := func() {
 			// Because right now port request is send asynchronously in a goroutine, we need to
 			// wait after each test case for any requests before moving onto the next test case.
 			// This is to ensure test isolation. Otherwise, the async request may "spill over" to
 			// the next test case which would be hard to debug.
-			By("does not notify port listener")
+			By("does not notify port listener about association")
 			Consistently(func() []*http.Request {
 				return server.ReceivedRequests()
 			}).Should(HaveLen(0))
 		}
 		Context("Controller network exists, but local network does not exist", func() {
 			BeforeEach(setupControllerNetworkWithoutLocalNetwork)
-			AfterEach(assertAfterEachDoesNotNotify)
-			It("errors", assertErrors)
+			AfterEach(assertAfterEachDoesNotNotifyAboutAssociation)
+			It("returns an error", assertReturnsError)
 			It("doesn't allocate resources in controller", assertDoesNotAllocate)
 			It("doesn't configure HNS endpoint", assertDoesNotConfigure)
 		})
 		Context("Controller network does not exist, but local network does", func() {
 			BeforeEach(setupLocalNetworkWithoutControllerNetwork)
-			AfterEach(assertAfterEachDoesNotNotify)
-			It("errors", assertErrors)
+			AfterEach(assertAfterEachDoesNotNotifyAboutAssociation)
+			It("returns an error", assertReturnsError)
 			It("doesn't allocate resources in controller", assertDoesNotAllocate)
 			It("doesn't configure HNS endpoint", assertDoesNotConfigure)
 		})
 	})
 
 	Context("DeleteEndpoint", func() {
+		var recvChan chan interface{}
+		var server *ghttp.Server
+		BeforeEach(func() {
+			recvChan = make(chan interface{})
+			server = testServer(recvChan)
+			server.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("POST", "/port"),
+					ghttp.RespondWith(http.StatusOK, ""),
+				),
+			)
+			// We need to use RouteToHandler method here, because it accepts regex paths.
+			server.RouteToHandler("DELETE", regexp.MustCompile(`port/.*`), ghttp.CombineHandlers(
+				ghttp.RespondWith(http.StatusOK, ""),
+			))
+		})
+		AfterEach(func() {
+			server.Close()
+		})
+
+		setupLocalEndpointAndContainerInController := func() {
+			setupControllerNetworkAndLocalNetwork()
+			_, err := testedCore.CreateEndpoint(dockerNetID, endpointID)
+			Expect(err).ToNot(HaveOccurred())
+
+			// wait for port association request to arrive before continuing, otherwise there is
+			// a possible race condition with port disassociation request.
+			Eventually(func() []*http.Request {
+				return server.ReceivedRequests()
+			}).Should(HaveLen(1))
+		}
+
+		assertReturnsError := func() {
+			err := testedCore.DeleteEndpoint(dockerNetID, endpointID)
+			Expect(err).To(HaveOccurred())
+		}
+		assertRemovesResource := func() {
+			_ = testedCore.DeleteEndpoint(dockerNetID, endpointID)
+
+			vm, err := controller.GetInstance(endpointID)
+			Expect(err).To(HaveOccurred())
+			Expect(vm).To(BeNil())
+		}
+		assertAfterEachNotifiesAboutDissociation := func() {
+			By("notifies port listener about dissacociation")
+			// we expect two requests to have arrived: first for port association in test setup;
+			// the other is the one we actually look for.
+			Eventually(func() []*http.Request {
+				return server.ReceivedRequests()
+			}).Should(HaveLen(2))
+		}
+
+		Context("Local endpoint and Controller resource exist", func() {
+			BeforeEach(setupLocalEndpointAndContainerInController)
+			AfterEach(assertAfterEachNotifiesAboutDissociation)
+			It("does not error", func() {
+				err := testedCore.DeleteEndpoint(dockerNetID, endpointID)
+				Expect(err).ToNot(HaveOccurred())
+			})
+			It("removes local endpoint", func() {
+				_ = testedCore.DeleteEndpoint(dockerNetID, endpointID)
+
+				ep, err := localEpRepo.GetEndpoint(endpointID)
+				Expect(ep).To(BeNil())
+				Expect(err).To(HaveOccurred())
+			})
+			It("removes resource from Controller", assertRemovesResource)
+		})
+		Context("Only resource in Controller exists", func() {
+			BeforeEach(func() {
+				setupLocalEndpointAndContainerInController()
+				err := localEpRepo.DeleteEndpoint(endpointID)
+				Expect(err).ToNot(HaveOccurred())
+			})
+			AfterEach(assertAfterEachNotifiesAboutDissociation)
+			It("returns an error", assertReturnsError)
+			It("removes resource from Controller", assertRemovesResource)
+		})
+		Context("Only local endpoint exists", func() {
+			BeforeEach(func() {
+				setupLocalEndpointAndContainerInController()
+				err := controller.DeleteContainer(endpointID)
+				Expect(err).ToNot(HaveOccurred())
+			})
+			AfterEach(func() {
+				By("does not notify port listener about dissacociation")
+				// we expect only one request to have arrived - for port association in setup;
+				Consistently(func() []*http.Request {
+					return server.ReceivedRequests()
+				}).Should(HaveLen(1))
+			})
+			It("returns an error", assertReturnsError)
+			It("does not remove local endpoint", func() {
+				_ = testedCore.DeleteEndpoint(dockerNetID, endpointID)
+
+				ep, err := localEpRepo.GetEndpoint(endpointID)
+				Expect(ep).ToNot(BeNil())
+				Expect(err).ToNot(HaveOccurred())
+			})
+		})
+
 	})
 })
 

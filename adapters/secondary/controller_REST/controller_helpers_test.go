@@ -17,7 +17,10 @@
 package controller_rest_test
 
 import (
+	"errors"
 	"fmt"
+	"regexp"
+	"strings"
 
 	contrail "github.com/Juniper/contrail-go-api"
 	"github.com/Juniper/contrail-go-api/config"
@@ -149,7 +152,7 @@ func ForceDeleteProject(c *controller_rest.ControllerAdapterImpl, tenant string)
 	projToDelete, _ := c.ApiClient.FindByName("project", fmt.Sprintf("%s:%s", common.DomainName,
 		tenant))
 	if projToDelete != nil {
-		c.DeleteElementRecursive(projToDelete)
+		ForceDeleteElementRecursive(c, projToDelete)
 	}
 }
 
@@ -157,6 +160,47 @@ func CleanupLingeringVM(c *controller_rest.ControllerAdapterImpl, containerID st
 	instance, err := types.VirtualMachineByName(c.ApiClient, containerID)
 	if err == nil {
 		log.Debugln("Cleaning up lingering test vm", instance.GetUuid())
-		c.DeleteElementRecursive(instance)
+		ForceDeleteElementRecursive(c, instance)
 	}
+}
+
+// This regex finds all strings like:
+// `virtual-network/23e300f4-ab1a-4d97-a1d9-9ed69b601e17`
+var resourceUriRegexp = regexp.MustCompile(
+	"([a-z-]*\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})")
+
+func ForceDeleteElementRecursive(c *controller_rest.ControllerAdapterImpl, parent contrail.IObject) error {
+	log.Debugln("Deleting", parent.GetType(), parent.GetUuid())
+	for err := c.ApiClient.Delete(parent); err != nil; err = c.ApiClient.Delete(parent) {
+		// TODO: when fixing this method, consider using c.is404() method.
+		if strings.Contains(err.Error(), "404 Resource") {
+			log.Errorln("Failed to delete Contrail resource", err.Error())
+			break
+		} else if strings.Contains(err.Error(), "409 Conflict") {
+			msg := err.Error()
+			// example error message when object has children:
+			// `409 Conflict: Delete when children still present:
+			// ['http://10.7.0.54:8082/virtual-network/23e300f4-ab1a-4d97-a1d9-9ed69b601e17']`
+			found := resourceUriRegexp.FindAll([]byte(msg), -1)
+
+			for _, f := range found {
+				split := strings.Split(string(f), "/")
+				typename := split[0]
+				UUID := split[1]
+				var child contrail.IObject
+				child, err = c.ApiClient.FindByUuid(typename, UUID)
+				if err != nil {
+					return err
+				}
+				if child == nil {
+					return errors.New("Child object is nil")
+				}
+				err = ForceDeleteElementRecursive(c, child)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }

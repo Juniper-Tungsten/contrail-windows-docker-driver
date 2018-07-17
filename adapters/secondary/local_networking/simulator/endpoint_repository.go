@@ -40,7 +40,7 @@ func (repo *InMemEndpointRepository) CreateEndpoint(name string, container *mode
 	return "123", nil
 }
 
-func (repo *InMemEndpointRepository) GetEndpointByName(name string) (*hcsshim.HNSEndpoint, error) {
+func (repo *InMemEndpointRepository) GetEndpoint(name string) (*hcsshim.HNSEndpoint, error) {
 	if ep, exists := repo.endpoints[name]; exists {
 		return &ep, nil
 	} else {
@@ -48,6 +48,11 @@ func (repo *InMemEndpointRepository) GetEndpointByName(name string) (*hcsshim.HN
 	}
 }
 
-func (repo *InMemEndpointRepository) DeleteEndpoint(endpointID string) error {
-	return errors.New("Not implemented yet")
+func (repo *InMemEndpointRepository) DeleteEndpoint(name string) error {
+	if _, exists := repo.endpoints[name]; exists {
+		delete(repo.endpoints, name)
+		return nil
+	} else {
+		return errors.New("endpoint not found, so couldn't delete it")
+	}
 }
