@@ -169,28 +169,14 @@ func (d *ServerCNM) StopServing() error {
 }
 
 func (d *ServerCNM) GetCapabilities() (*network.CapabilitiesResponse, error) {
-	log.Debugln("=== GetCapabilities")
+	log.Debugln("Received GetCapabilities request from docker daemon")
 	r := &network.CapabilitiesResponse{}
 	r.Scope = network.LocalScope
 	return r, nil
 }
 
 func (d *ServerCNM) CreateNetwork(req *network.CreateNetworkRequest) error {
-	log.Debugln("=== CreateNetwork")
-	log.Debugln("network.NetworkID =", req.NetworkID)
-	log.Debugln(req)
-	log.Debugln("IPv4:")
-	for _, n := range req.IPv4Data {
-		log.Debugln(n)
-	}
-	log.Debugln("IPv6:")
-	for _, n := range req.IPv6Data {
-		log.Debugln(n)
-	}
-	log.Debugln("options:")
-	for k, v := range req.Options {
-		fmt.Printf("%v: %v\n", k, v)
-	}
+	log.Debugln("Received CreateNetwork request from docker daemon:", req)
 
 	reqGenericOptionsMap, exists := req.Options[netlabel.GenericData]
 	if !exists {
@@ -226,36 +212,27 @@ func (d *ServerCNM) CreateNetwork(req *network.CreateNetworkRequest) error {
 
 func (d *ServerCNM) AllocateNetwork(req *network.AllocateNetworkRequest) (
 	*network.AllocateNetworkResponse, error) {
-	log.Debugln("=== AllocateNetwork")
-	log.Debugln(req)
+	log.Debugln("Received AllocateNetwork request from docker daemon:", req)
 	// This method is used in swarm, in remote plugins. We don't implement it.
 	return nil, errors.New("AllocateNetwork is not implemented")
 }
 
 func (d *ServerCNM) DeleteNetwork(req *network.DeleteNetworkRequest) error {
-	log.Debugln("=== DeleteNetwork")
-	log.Debugln(req)
+	log.Debugln("Received DeleteNetwork request from docker daemon:", req)
 
 	return d.Core.DeleteNetwork(req.NetworkID)
 }
 
 func (d *ServerCNM) FreeNetwork(req *network.FreeNetworkRequest) error {
-	log.Debugln("=== FreeNetwork")
-	log.Debugln(req)
+	log.Debugln("Received FreeNetwork request from docker daemon:", req)
+
 	// This method is used in swarm, in remote plugins. We don't implement it.
 	return errors.New("FreeNetwork is not implemented")
 }
 
 func (d *ServerCNM) CreateEndpoint(req *network.CreateEndpointRequest) (
 	*network.CreateEndpointResponse, error) {
-	log.Debugln("=== CreateEndpoint")
-	log.Debugln(req)
-	log.Debugln(req.Interface)
-	log.Debugln(req.EndpointID)
-	log.Debugln("options:")
-	for k, v := range req.Options {
-		fmt.Printf("%v: %v\n", k, v)
-	}
+	log.Debugln("Received CreateEndpoint request from docker daemon:", req)
 
 	container, err := d.Core.CreateEndpoint(req.NetworkID, req.EndpointID)
 	if err != nil {
@@ -273,15 +250,13 @@ func (d *ServerCNM) CreateEndpoint(req *network.CreateEndpointRequest) (
 }
 
 func (d *ServerCNM) DeleteEndpoint(req *network.DeleteEndpointRequest) error {
-	log.Debugln("=== DeleteEndpoint")
-	log.Debugln(req)
+	log.Debugln("Received DeleteEndpoint request from docker daemon:", req)
 
 	return d.Core.DeleteEndpoint(req.NetworkID, req.EndpointID)
 }
 
 func (d *ServerCNM) EndpointInfo(req *network.InfoRequest) (*network.InfoResponse, error) {
-	log.Debugln("=== EndpointInfo")
-	log.Debugln(req)
+	log.Debugln("Received EndpointInfo request from docker daemon:", req)
 
 	hnsEpName := req.EndpointID
 	hnsEp, err := d.Core.LocalContrailEndpointsRepo.GetEndpoint(hnsEpName)
@@ -304,12 +279,7 @@ func (d *ServerCNM) EndpointInfo(req *network.InfoRequest) (*network.InfoRespons
 }
 
 func (d *ServerCNM) Join(req *network.JoinRequest) (*network.JoinResponse, error) {
-	log.Debugln("=== Join")
-	log.Debugln(req)
-	log.Debugln("options:")
-	for k, v := range req.Options {
-		fmt.Printf("%v: %v\n", k, v)
-	}
+	log.Debugln("Received Join request from docker daemon:", req)
 
 	hnsEp, err := d.Core.LocalContrailEndpointsRepo.GetEndpoint(req.EndpointID)
 	if err != nil {
@@ -328,8 +298,7 @@ func (d *ServerCNM) Join(req *network.JoinRequest) (*network.JoinResponse, error
 }
 
 func (d *ServerCNM) Leave(req *network.LeaveRequest) error {
-	log.Debugln("=== Leave")
-	log.Debugln(req)
+	log.Debugln("Received Leave request from docker daemon:", req)
 
 	hnsEp, err := d.Core.LocalContrailEndpointsRepo.GetEndpoint(req.EndpointID)
 	if err != nil {
@@ -343,30 +312,26 @@ func (d *ServerCNM) Leave(req *network.LeaveRequest) error {
 }
 
 func (d *ServerCNM) DiscoverNew(req *network.DiscoveryNotification) error {
-	log.Debugln("=== DiscoverNew")
-	log.Debugln(req)
+	log.Debugln("Received DiscoverNew request from docker daemon:", req)
 	// We don't care about discovery notifications.
 	return nil
 }
 
 func (d *ServerCNM) DiscoverDelete(req *network.DiscoveryNotification) error {
-	log.Debugln("=== DiscoverDelete")
-	log.Debugln(req)
+	log.Debugln("Received DiscoverDelete request from docker daemon:", req)
 	// We don't care about discovery notifications.
 	return nil
 }
 
 func (d *ServerCNM) ProgramExternalConnectivity(
 	req *network.ProgramExternalConnectivityRequest) error {
-	log.Debugln("=== ProgramExternalConnectivity")
-	log.Debugln(req)
+	log.Debugln("Received ProgramExternalConnectivity request from docker daemon:", req)
 	return nil
 }
 
 func (d *ServerCNM) RevokeExternalConnectivity(
 	req *network.RevokeExternalConnectivityRequest) error {
-	log.Debugln("=== RevokeExternalConnectivity")
-	log.Debugln(req)
+	log.Debugln("Received RevokeExternalConnectivity request from docker daemon:", req)
 	return nil
 }
 
@@ -392,7 +357,7 @@ func (d *ServerCNM) waitForPipe(waitUntilExists bool) error {
 		if fileExists := !os.IsNotExist(err); fileExists == waitUntilExists {
 			break
 		} else {
-			log.Errorf("Waiting for pipe file, but: %s", err)
+			log.Warnf("Waiting for pipe file, but: %s", err)
 		}
 
 		time.Sleep(common.PipePollingRate)
@@ -415,7 +380,7 @@ func (d *ServerCNM) waitUntilPipeDialable() error {
 			return nil
 		}
 
-		log.Errorf("Waiting until dialable, but: %s", err)
+		log.Warnf("Waiting until dialable, but: %s", err)
 
 		time.Sleep(common.PipePollingRate)
 	}
