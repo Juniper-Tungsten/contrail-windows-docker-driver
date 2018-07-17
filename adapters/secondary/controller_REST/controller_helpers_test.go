@@ -23,13 +23,15 @@ import (
 	"github.com/Juniper/contrail-go-api/config"
 	"github.com/Juniper/contrail-go-api/types"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/api"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	. "github.com/onsi/gomega"
 	log "github.com/sirupsen/logrus"
 )
 
-func NewTestClientAndProject(tenant string) (*controller_rest.ControllerAdapter, *types.Project) {
-	c := controller_rest.NewFakeControllerAdapter()
+func NewTestClientAndProject(tenant string) (*controller_rest.ControllerAdapterImpl, *types.Project) {
+	fakeApiClient := api.NewFakeApiClient()
+	c := controller_rest.NewControllerAdapterImpl(fakeApiClient)
 
 	project, err := c.NewProject(common.DomainName, tenant)
 	Expect(err).ToNot(HaveOccurred())
@@ -58,13 +60,12 @@ func CreateTestNetwork(c contrail.ApiClient, netName string,
 	return testNetwork
 }
 
-func CreateTestSecurityGroup(c contrail.ApiClient, groupName string,
-	project *types.Project) *types.SecurityGroup {
-	group := new(types.SecurityGroup)
-	group.SetFQName("project", []string{common.DomainName, project.GetName(), groupName})
-	err := c.Create(group)
+func RemoveTestSecurityGroup(c contrail.ApiClient, groupName string,
+	project *types.Project) {
+	secGroupFqName := fmt.Sprintf("%s:%s:default", common.DomainName, tenantName)
+	secGroup, err := types.SecurityGroupByName(c, secGroupFqName)
+	err = c.Delete(secGroup)
 	Expect(err).ToNot(HaveOccurred())
-	return group
 }
 
 func AddSubnetWithDefaultGateway(c contrail.ApiClient, subnetPrefix, defaultGW string,
@@ -144,7 +145,7 @@ func CreateTestInstanceIP(c contrail.ApiClient, tenantName string,
 	return allocatedIP
 }
 
-func ForceDeleteProject(c *controller_rest.ControllerAdapter, tenant string) {
+func ForceDeleteProject(c *controller_rest.ControllerAdapterImpl, tenant string) {
 	projToDelete, _ := c.ApiClient.FindByName("project", fmt.Sprintf("%s:%s", common.DomainName,
 		tenant))
 	if projToDelete != nil {
@@ -152,7 +153,7 @@ func ForceDeleteProject(c *controller_rest.ControllerAdapter, tenant string) {
 	}
 }
 
-func CleanupLingeringVM(c *controller_rest.ControllerAdapter, containerID string) {
+func CleanupLingeringVM(c *controller_rest.ControllerAdapterImpl, containerID string) {
 	instance, err := types.VirtualMachineByName(c.ApiClient, containerID)
 	if err == nil {
 		log.Debugln("Cleaning up lingering test vm", instance.GetUuid())

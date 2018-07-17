@@ -32,7 +32,6 @@ import (
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/core/driver_core"
 	winio "github.com/Microsoft/go-winio"
-	"github.com/Microsoft/hcsshim"
 	dockerTypes "github.com/docker/docker/api/types"
 	dockerClient "github.com/docker/docker/client"
 	"github.com/docker/go-connections/sockets"
@@ -40,8 +39,6 @@ import (
 	"github.com/docker/libnetwork/netlabel"
 	log "github.com/sirupsen/logrus"
 )
-
-const hnsEndpointWaitingTime = 5
 
 type DockerPluginServer struct {
 	// TODO: for now, Core field is public, because we need to access its fields, like controller.
@@ -224,12 +221,12 @@ func (d *DockerPluginServer) CreateNetwork(req *network.CreateNetworkRequest) er
 	if len(req.IPv4Data) == 0 {
 		return errors.New("Docker subnet IPv4 data missing")
 	}
-	ipPool := req.IPv4Data[0].Pool
+	subnetCIDR := req.IPv4Data[0].Pool
 
 	tenantName := tenant.(string)
 	networkName := netName.(string)
 
-	return d.Core.CreateNetwork(tenantName, networkName, ipPool)
+	return d.Core.CreateNetwork(tenantName, networkName, subnetCIDR)
 }
 
 func (d *DockerPluginServer) AllocateNetwork(req *network.AllocateNetworkRequest) (
@@ -312,102 +309,16 @@ func (d *DockerPluginServer) CreateEndpoint(req *network.CreateEndpointRequest) 
 		return nil, err
 	}
 
-	contrailNetwork, err := d.Core.Controller.GetNetwork(meta.tenant, meta.network)
-	if err != nil {
-		return nil, err
-	}
-	log.Infoln("Retrieved Contrail network:", contrailNetwork.GetUuid())
-
-	// TODO JW-187.
-	// We need to retreive Container ID here and use it instead of EndpointID as
-	// argument to GetOrCreateInstance().
-	// EndpointID is equiv to interface, but in Contrail, we have a "VirtualMachine" in
-	// data model.
-	// A single VM can be connected to two or more overlay networks, but when we use
-	// EndpointID, this won't work.
-	// We need something like:
-	// containerID := req.Options["vmname"]
-	containerID := req.EndpointID
-
-	contrailIpam, err := d.Core.Controller.GetIpamSubnet(contrailNetwork, meta.subnetCIDR)
-	if err != nil {
-		return nil, err
-	}
-	contrailSubnetCIDR := d.Core.GetContrailSubnetCIDR(contrailIpam)
-
-	contrailVif, err := d.Core.Controller.GetOrCreateInterface(contrailNetwork, meta.tenant,
-		containerID)
+	container, err := d.Core.CreateEndpoint(meta.tenant, meta.network, meta.subnetCIDR, req.EndpointID)
 	if err != nil {
 		return nil, err
 	}
 
-	contrailVM, err := d.Core.Controller.GetOrCreateInstance(contrailVif, containerID)
-	if err != nil {
-		return nil, err
-	}
-
-	contrailIP, err := d.Core.Controller.GetOrCreateInstanceIp(contrailNetwork, contrailVif, contrailIpam.SubnetUuid)
-	if err != nil {
-		return nil, err
-	}
-	instanceIP := contrailIP.GetInstanceIpAddress()
-	log.Infoln("Retrieved instance IP:", instanceIP)
-
-	contrailGateway := contrailIpam.DefaultGateway
-	log.Infoln("Retrieved GW address:", contrailGateway)
-	if contrailGateway == "" {
-		return nil, errors.New("Default GW is empty")
-	}
-
-	contrailMac, err := d.Core.Controller.GetInterfaceMac(contrailVif)
-	log.Infoln("Retrieved MAC:", contrailMac)
-	if err != nil {
-		return nil, err
-	}
-	// contrail MACs are like 11:22:aa:bb:cc:dd
-	// HNS needs MACs like 11-22-AA-BB-CC-DD
-	formattedMac := strings.Replace(strings.ToUpper(contrailMac), ":", "-", -1)
-
-	hnsNet, err := d.Core.LocalContrailNetworksRepo.GetNetwork(meta.tenant, meta.network, contrailSubnetCIDR)
-	if err != nil {
-		return nil, err
-	}
-
-	hnsEndpointConfig := &hcsshim.HNSEndpoint{
-		VirtualNetworkName: hnsNet.Name,
-		Name:               req.EndpointID,
-		IPAddress:          net.ParseIP(instanceIP),
-		MacAddress:         formattedMac,
-		GatewayAddress:     contrailGateway,
-	}
-
-	hnsEndpointID, err := d.Core.LocalContrailEndpointsRepo.CreateEndpoint(hnsEndpointConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: test this when Agent is ready
-	ifName := d.generateFriendlyName(hnsEndpointID)
-
-	go func() {
-		// Temporary workaround for HNS issue.
-		// Due to the bug in Microsoft HNS, Docker Driver has to wait for some time until endpoint
-		// is ready to handle ARP requests. Unfortunately it seems that HNS doesn't have api
-		// to verify if endpoint setup is done.
-
-		time.Sleep(hnsEndpointWaitingTime * time.Second)
-		err := d.Core.Agent.AddPort(contrailVM.GetUuid(), contrailVif.GetUuid(), ifName, contrailMac, containerID,
-			contrailIP.GetInstanceIpAddress(), contrailNetwork.GetUuid())
-		if err != nil {
-			log.Error(err.Error())
-		}
-	}()
-
-	epAddressCIDR := fmt.Sprintf("%s/%v", instanceIP, contrailIpam.Subnet.IpPrefixLen)
+	ipCIDR := fmt.Sprintf("%s/%v", container.IP, container.PrefixLen)
 	r := &network.CreateEndpointResponse{
 		Interface: &network.EndpointInterface{
-			Address:    epAddressCIDR,
-			MacAddress: contrailMac,
+			Address:    ipCIDR,
+			MacAddress: container.Mac,
 		},
 	}
 	return r, nil
@@ -442,6 +353,7 @@ func (d *DockerPluginServer) DeleteEndpoint(req *network.DeleteEndpointRequest) 
 			// Temporary workaround for HNS issue, see 'CreateEndpoint' method.
 			// This sleep is added to ensure that DeletePort request is called after AddPort.
 			// Value of waiting time has to be equal or greater than the one in 'CreateEndpoint'.
+			const hnsEndpointWaitingTime = 5
 			time.Sleep(hnsEndpointWaitingTime * time.Second)
 			err := d.Core.Agent.DeletePort(contrailVif.GetUuid())
 			if err != nil {
@@ -700,20 +612,4 @@ func (d *DockerPluginServer) hnsNetworksMeta() ([]NetworkMeta, error) {
 		})
 	}
 	return meta, nil
-}
-
-func (d *DockerPluginServer) generateFriendlyName(hnsEndpointID string) string {
-	// Here's how the Forwarding Extension (kernel) can identify interfaces based on their
-	// friendly names.
-	// Windows Containers have NIC names like "NIC ID abcdef", where abcdef are the first 6 chars
-	// of their HNS endpoint ID.
-	// Hyper-V Containers have NIC names consisting of two uuids, probably representing utitlity
-	// VM's interface and endpoint's interface:
-	// "227301f6-bee9-4ae2-8a93-5e900cde3f47--910c5490-bff8-45e3-a2a0-0114ed9903e0"
-	// The second UUID (after the "--") is the HNS endpoints ID.
-
-	// For now, we will always send the name in the Windows Containers format, because it probably
-	// has enough information to recognize it in kernel (6 first chars of UUID should be enough):
-	containerNicID := strings.Split(hnsEndpointID, "-")[0]
-	return fmt.Sprintf("Container NIC %s", containerNicID)
 }

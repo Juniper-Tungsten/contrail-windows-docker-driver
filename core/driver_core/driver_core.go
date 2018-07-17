@@ -21,9 +21,14 @@ package driver_core
 import (
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	// TODO: this import should be removed when making Controller port smaller
 	"github.com/Juniper/contrail-go-api/types"
+
+	// TODO: this import should be removed
+	"github.com/Microsoft/hcsshim"
 
 	"github.com/Juniper/contrail-windows-docker-driver/core/ports"
 	log "github.com/sirupsen/logrus"
@@ -37,17 +42,21 @@ type ContrailDriverCore struct {
 	Agent                      ports.Agent
 	LocalContrailNetworksRepo  ports.LocalContrailNetworkRepository
 	LocalContrailEndpointsRepo ports.LocalContrailEndpointRepository
+	// TODO: get rid of this sleep workaround asap
+	hnsEndpointWaitingTime time.Duration
 }
 
 func NewContrailDriverCore(vr ports.VRouter, c ports.Controller, a ports.Agent,
 	nr ports.LocalContrailNetworkRepository,
-	er ports.LocalContrailEndpointRepository) (*ContrailDriverCore, error) {
+	er ports.LocalContrailEndpointRepository,
+	hnsEndpointWaitingTime time.Duration) (*ContrailDriverCore, error) {
 	core := ContrailDriverCore{
 		vrouter:    vr,
 		Controller: c,
 		Agent:      a,
 		LocalContrailNetworksRepo:  nr,
 		LocalContrailEndpointsRepo: er,
+		hnsEndpointWaitingTime:     hnsEndpointWaitingTime,
 	}
 	if err := core.initializeAdapters(); err != nil {
 		return nil, err
@@ -59,27 +68,19 @@ func (core *ContrailDriverCore) initializeAdapters() error {
 	return core.vrouter.Initialize()
 }
 
-func (core *ContrailDriverCore) CreateNetwork(tenantName, networkName, ipPool string) error {
-	// Check if network is already created in Contrail.
-	log.Infoln(tenantName, networkName)
-	contrailNetwork, err := core.Controller.GetNetwork(tenantName, networkName)
+func (core *ContrailDriverCore) CreateNetwork(tenantName, networkName, subnetCIDR string) error {
+	network, ipamSubnet, err := core.Controller.GetNetworkWithSubnet(tenantName, networkName, subnetCIDR)
 	if err != nil {
 		return err
 	}
-	if contrailNetwork == nil {
+	if network == nil {
 		return errors.New("Retrieved Contrail network is nil")
 	}
 
-	log.Infoln("Got Contrail network", contrailNetwork.GetDisplayName())
+	log.Debugln("Got Contrail network", network.GetDisplayName())
 
-	contrailIpam, err := core.Controller.GetIpamSubnet(contrailNetwork, ipPool)
-	if err != nil {
-		return err
-	}
-	subnetCIDR := core.GetContrailSubnetCIDR(contrailIpam)
-
-	contrailGateway := contrailIpam.DefaultGateway
-	if contrailGateway == "" {
+	gateway := ipamSubnet.DefaultGateway
+	if gateway == "" {
 		// TODO: this fails in unit tests using contrail-go-api mock. So either:
 		// * fix contrail-go-api mock to return *some* default GW
 		// * or maybe we should keep going if default GW is empty, as a user may wish not
@@ -87,12 +88,8 @@ func (core *ContrailDriverCore) CreateNetwork(tenantName, networkName, ipPool st
 		log.Warn("Default GW is empty")
 	}
 
-	// TODO: all the statements above should probably be refactored into a single method of
-	// Controller port. Something like
-	// subnetCIDR, gateway := GetSubnet(tenantName, networkName, ipPool)
-
 	_, err = core.LocalContrailNetworksRepo.CreateNetwork(tenantName, networkName, subnetCIDR,
-		contrailGateway)
+		gateway)
 
 	return err
 }
@@ -101,7 +98,91 @@ func (core *ContrailDriverCore) DeleteNetwork(tenantName, networkName, subnetCID
 	return core.LocalContrailNetworksRepo.DeleteNetwork(tenantName, networkName, subnetCIDR)
 }
 
+func (core *ContrailDriverCore) CreateEndpoint(tenantName, networkName, subnetCIDR, endpointID string) (*ports.ContrailContainer, error) {
+
+	// WORKAROUND: We need to retreive Container ID here and use it instead of EndpointID as
+	// argument to GetOrCreateInstance(). EndpointID is equiv to interface, but in Contrail,
+	// we have a "VirtualMachine" in data model. A single VM can be connected to two or more
+	// overlay networks, but when we use EndpointID, this won't work. We need something like:
+	// containerID := req.Options["vmname"]
+	containerID := endpointID
+
+	network, ipamSubnet, err := core.Controller.GetNetworkWithSubnet(tenantName, networkName, subnetCIDR)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Infoln(core.Controller.CreateContainerInSubnet(tenantName, containerID, network, ipamSubnet))
+
+	container, err := core.Controller.CreateContainerInSubnet(tenantName, containerID, network, ipamSubnet)
+	if err != nil {
+		return nil, err
+	}
+
+	// contrail MACs are like 11:22:aa:bb:cc:dd
+	// HNS needs MACs like 11-22-AA-BB-CC-DD
+	formattedMac := strings.Replace(strings.ToUpper(container.Mac), ":", "-", -1)
+
+	hnsNet, err := core.LocalContrailNetworksRepo.GetNetwork(tenantName, networkName, subnetCIDR)
+	if err != nil {
+		return nil, err
+	}
+
+	gateway := ipamSubnet.DefaultGateway
+	if gateway == "" {
+		return nil, errors.New("Default GW is empty")
+	}
+
+	// TODO: We should remove references to hcsshim here - probably by adding a new struct
+	// to core/ports/models.go
+	hnsEndpointConfig := &hcsshim.HNSEndpoint{
+		VirtualNetworkName: hnsNet.Name,
+		Name:               endpointID,
+		IPAddress:          container.IP,
+		MacAddress:         formattedMac,
+		GatewayAddress:     gateway,
+	}
+
+	hnsEndpointID, err := core.LocalContrailEndpointsRepo.CreateEndpoint(hnsEndpointConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: this can be refactored into some nice mechanism.
+	ifName := core.generateFriendlyName(hnsEndpointID)
+
+	go func() {
+		// WORKAROUND: Temporary workaround for HNS issue.
+		// Due to the bug in Microsoft HNS, Docker Driver has to wait for some time until endpoint
+		// is ready to handle ARP requests. Unfortunately it seems that HNS doesn't have api
+		// to verify if endpoint setup is done
+		time.Sleep(core.hnsEndpointWaitingTime)
+		err := core.Agent.AddPort(container.VmUUID, container.VmiUUID, ifName,
+			container.Mac, containerID, container.IP.String(), network.GetUuid())
+		if err != nil {
+			log.Error(err.Error())
+		}
+	}()
+	return container, nil
+}
+
 func (core *ContrailDriverCore) GetContrailSubnetCIDR(ipam *types.IpamSubnetType) string {
 	// TODO: this should be probably moved to Controller when we make Controller port smaller.
 	return fmt.Sprintf("%s/%v", ipam.Subnet.IpPrefix, ipam.Subnet.IpPrefixLen)
+}
+
+func (core *ContrailDriverCore) generateFriendlyName(hnsEndpointID string) string {
+	// Here's how the Forwarding Extension (kernel) can identify interfaces based on their
+	// friendly names.
+	// Windows Containers have NIC names like "NIC ID abcdef", where abcdef are the first 6 chars
+	// of their HNS endpoint ID.
+	// Hyper-V Containers have NIC names consisting of two uuids, probably representing utitlity
+	// VM's interface and endpoint's interface:
+	// "227301f6-bee9-4ae2-8a93-5e900cde3f47--910c5490-bff8-45e3-a2a0-0114ed9903e0"
+	// The second UUID (after the "--") is the HNS endpoints ID.
+
+	// For now, we will always send the name in the Windows Containers format, because it probably
+	// has enough information to recognize it in kernel (6 first chars of UUID should be enough):
+	containerNicID := strings.Split(hnsEndpointID, "-")[0]
+	return fmt.Sprintf("Container NIC %s", containerNicID)
 }

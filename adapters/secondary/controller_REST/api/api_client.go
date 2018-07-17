@@ -23,6 +23,10 @@ import (
 func NewFakeApiClient() *mocks.ApiClient {
 	mockedApiClient := new(mocks.ApiClient)
 	mockedApiClient.Init()
+	// Add interceptors to mimick the behaviour of actual API server.
+	mockedApiClient.AddInterceptor("virtual-network", &vnInterceptor{})
+	mockedApiClient.AddInterceptor("virtual-machine-interface", &vmiInterceptor{})
+	mockedApiClient.AddInterceptor("instance-ip", &iipInterceptor{})
 	return mockedApiClient
 }
 

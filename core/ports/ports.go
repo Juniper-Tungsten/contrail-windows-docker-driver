@@ -48,22 +48,17 @@ type LocalContrailEndpointRepository interface {
 
 // TODO: This interface can be simplified
 type Controller interface {
+	CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, error)
+	GetNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, *types.IpamSubnetType, error)
+
+	CreateContainerInSubnet(tenantName, containerID string, network *types.VirtualNetwork, subnet *types.IpamSubnetType) (*ContrailContainer, error)
+
+	// This method is only used by tests; to remove?
 	NewProject(domain, tenant string) (*types.Project, error)
 
-	CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, error)
+	// To remove when refactoring plugin.DeleteEndpoint
 	GetNetwork(tenantName, networkName string) (*types.VirtualNetwork, error)
-	GetIpamSubnet(net *types.VirtualNetwork, CIDR string) (*types.IpamSubnetType, error)
-	GetDefaultGatewayIp(subnet *types.IpamSubnetType) (string, error)
-
-	GetOrCreateInstance(vif *types.VirtualMachineInterface, containerId string) (*types.VirtualMachine, error)
 	GetInstance(containerId string) (*types.VirtualMachine, error)
-
 	GetExistingInterface(net *types.VirtualNetwork, tenantName, containerId string) (*types.VirtualMachineInterface, error)
-	GetOrCreateInterface(net *types.VirtualNetwork, tenantName, containerId string) (*types.VirtualMachineInterface, error)
-	GetInterfaceMac(iface *types.VirtualMachineInterface) (string, error)
-
-	GetOrCreateInstanceIp(net *types.VirtualNetwork, iface *types.VirtualMachineInterface,
-		subnetUuid string) (*types.InstanceIp, error)
-
 	DeleteElementRecursive(parent contrail.IObject) error
 }
