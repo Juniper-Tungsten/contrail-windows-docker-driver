@@ -19,7 +19,7 @@ package agent_test
 import (
 	"net/url"
 
-	"github.com/Juniper/contrail-windows-docker-driver/agent"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/port_association/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/core/ports"
 
 	. "github.com/onsi/ginkgo"
@@ -57,7 +57,7 @@ func (h *httpHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 var _ = Describe("AgentRestApi", func() {
 	mockHandler := &httpHandler{}
 	var testServer *httptest.Server
-	var agentInstance ports.Agent
+	var agentInstance ports.PortAssociation
 
 	const (
 		vmUUID    = "vmUUID"

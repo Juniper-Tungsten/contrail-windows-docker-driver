@@ -37,18 +37,18 @@ type ContrailDriverCore struct {
 	// TODO: all these fields below should be made private as we remove the need for them in
 	// driver package.
 	Controller                 ports.Controller
-	Agent                      ports.Agent
+	PortAssociation            ports.PortAssociation
 	LocalContrailNetworksRepo  ports.LocalContrailNetworkRepository
 	LocalContrailEndpointsRepo ports.LocalContrailEndpointRepository
 }
 
-func NewContrailDriverCore(vr ports.VRouter, c ports.Controller, a ports.Agent,
+func NewContrailDriverCore(vr ports.VRouter, c ports.Controller, a ports.PortAssociation,
 	nr ports.LocalContrailNetworkRepository,
 	er ports.LocalContrailEndpointRepository) (*ContrailDriverCore, error) {
 	core := ContrailDriverCore{
-		vrouter:    vr,
-		Controller: c,
-		Agent:      a,
+		vrouter:                    vr,
+		Controller:                 c,
+		PortAssociation:            a,
 		LocalContrailNetworksRepo:  nr,
 		LocalContrailEndpointsRepo: er,
 	}
@@ -141,7 +141,7 @@ func (core *ContrailDriverCore) createContainerEndpointInLocalNetwork(container 
 }
 
 func (core *ContrailDriverCore) associatePort(container *model.Container, ep *model.LocalEndpoint) error {
-	return core.Agent.AddPort(container.VmUUID, container.VmiUUID, ep.IfName,
+	return core.PortAssociation.AddPort(container.VmUUID, container.VmiUUID, ep.IfName,
 		container.Mac, ep.Name, container.IP.String(), container.NetUUID)
 }
 
@@ -176,7 +176,7 @@ func (core *ContrailDriverCore) DeleteEndpoint(dockerNetID, endpointID string) e
 		log.Warn("When handling DeleteEndpoint, interface wasn't found")
 	} else {
 		go func() {
-			err := core.Agent.DeletePort(vifUUID)
+			err := core.PortAssociation.DeletePort(vifUUID)
 			if err != nil {
 				log.Error(err.Error())
 			}
