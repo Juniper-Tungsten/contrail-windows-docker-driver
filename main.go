@@ -154,9 +154,7 @@ func (ws *WinService) Execute(args []string, winChangeReqChan <-chan svc.ChangeR
 
 	epRepo := &hns.HNSEndpointRepository{}
 
-	hnsWorkaroundSleepTime := time.Second * 5
-	core, err := driver_core.NewContrailDriverCore(vrouter, controller, agent, netRepo, epRepo,
-		hnsWorkaroundSleepTime)
+	core, err := driver_core.NewContrailDriverCore(vrouter, controller, agent, netRepo, epRepo)
 	if err != nil {
 		log.Error(err)
 		return

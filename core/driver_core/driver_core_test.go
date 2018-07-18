@@ -302,8 +302,7 @@ func newSimulatedModulesUnderTest() (c *driver_core.ContrailDriverCore, controll
 	agent := agent.NewAgentRestAPI(http.DefaultClient, serverUrl)
 
 	var err error
-	sleepTime := time.Second * 0
-	c, err = driver_core.NewContrailDriverCore(vrouter, controller, agent, netRepo, epRepo, sleepTime)
+	c, err = driver_core.NewContrailDriverCore(vrouter, controller, agent, netRepo, epRepo)
 	Expect(err).ToNot(HaveOccurred())
 
 	return

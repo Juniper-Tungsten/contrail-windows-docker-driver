@@ -823,9 +823,7 @@ func newIntegrationModulesUnderTest() (vr ports.VRouter, d *docker_libnetwork_pl
 	serverUrl, _ := url.Parse("http://127.0.0.1:9091")
 	a := agent.NewAgentRestAPI(http.DefaultClient, serverUrl)
 
-	hnsWorkaroundSleepTime := time.Second * 0
-	driverCore, err := driver_core.NewContrailDriverCore(vr, c, a, netRepo, epRepo,
-		hnsWorkaroundSleepTime)
+	driverCore, err := driver_core.NewContrailDriverCore(vr, c, a, netRepo, epRepo)
 	Expect(err).ToNot(HaveOccurred())
 	d = docker_libnetwork_plugin.NewDockerPluginServer(driverCore)
 

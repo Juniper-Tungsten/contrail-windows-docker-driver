@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	// TODO: this import should be removed when making Controller port smaller
 
@@ -41,21 +40,17 @@ type ContrailDriverCore struct {
 	Agent                      ports.Agent
 	LocalContrailNetworksRepo  ports.LocalContrailNetworkRepository
 	LocalContrailEndpointsRepo ports.LocalContrailEndpointRepository
-	// TODO: get rid of this sleep workaround asap
-	hnsEndpointWaitingTime time.Duration
 }
 
 func NewContrailDriverCore(vr ports.VRouter, c ports.Controller, a ports.Agent,
 	nr ports.LocalContrailNetworkRepository,
-	er ports.LocalContrailEndpointRepository,
-	hnsEndpointWaitingTime time.Duration) (*ContrailDriverCore, error) {
+	er ports.LocalContrailEndpointRepository) (*ContrailDriverCore, error) {
 	core := ContrailDriverCore{
 		vrouter:    vr,
 		Controller: c,
 		Agent:      a,
 		LocalContrailNetworksRepo:  nr,
 		LocalContrailEndpointsRepo: er,
-		hnsEndpointWaitingTime:     hnsEndpointWaitingTime,
 	}
 	if err := core.initializeAdapters(); err != nil {
 		return nil, err
@@ -120,11 +115,6 @@ func (core *ContrailDriverCore) CreateEndpoint(dockerNetID, endpointID string) (
 	}
 
 	go func() {
-		// WORKAROUND: Temporary workaround for HNS issue.
-		// Due to the bug in Microsoft HNS, Docker Driver has to wait for some time until endpoint
-		// is ready to handle ARP requests. Unfortunately it seems that HNS doesn't have api
-		// to verify if endpoint setup is done
-		time.Sleep(core.hnsEndpointWaitingTime)
 		err := core.associatePort(container, localEndpoint)
 		if err != nil {
 			log.Error(err.Error())

@@ -304,11 +304,6 @@ func (d *DockerPluginServer) DeleteEndpoint(req *network.DeleteEndpointRequest) 
 		log.Warn("When handling DeleteEndpoint, interface wasn't found")
 	} else {
 		go func() {
-			// Temporary workaround for HNS issue, see 'CreateEndpoint' method.
-			// This sleep is added to ensure that DeletePort request is called after AddPort.
-			// Value of waiting time has to be equal or greater than the one in 'CreateEndpoint'.
-			const hnsEndpointWaitingTime = 5
-			time.Sleep(hnsEndpointWaitingTime * time.Second)
 			err := d.Core.Agent.DeletePort(contrailVif.GetUuid())
 			if err != nil {
 				log.Error(err.Error())
