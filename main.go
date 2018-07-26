@@ -19,8 +19,9 @@ import (
 	"flag"
 	"net/http"
 	"net/url"
+	"os"
+	"os/signal"
 	"strings"
-	"time"
 
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/primary/docker_libnetwork_plugin"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
@@ -33,26 +34,9 @@ import (
 	"github.com/Juniper/contrail-windows-docker-driver/core/vrouter"
 	"github.com/Juniper/contrail-windows-docker-driver/logging"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/sys/windows/svc"
-	"golang.org/x/sys/windows/svc/debug"
 )
 
-type WinService struct {
-	adapter        string
-	controllerIP   string
-	controllerPort int
-	agentURL       string
-	vswitchName    string
-	logDir         string
-	keys           auth.KeystoneParams
-}
-
 func main() {
-
-	isInteractive, err := svc.IsAnInteractiveSession()
-	if err != nil {
-		log.Fatalf("Don't know if the session is interactive: %v", err)
-	}
 
 	var adapter = flag.String("adapter", "Ethernet0",
 		"net adapter for HNS switch, must be physical")
@@ -70,8 +54,8 @@ func main() {
 			"vswitchName will equal \"Layered Ethernet0\". You can use Get-VMSwitch PowerShell "+
 			"command to check how the switch is called on your version of OS.")
 	var forceAsInteractive = flag.Bool("forceAsInteractive", false,
-		"if true, will act as if ran from interactive mode. This is useful when running this "+
-			"service from remote powershell session, because they're not interactive.")
+		"DEPRECATED. If true, will act as if ran from interactive mode. This is useful when "+
+			"running this service from remote powershell session, because they're not interactive.")
 	var os_auth_url = flag.String("os_auth_url", "", "Keystone auth url. If empty, will read "+
 		"from environment variable")
 	var os_username = flag.String("os_username", "", "Contrail username. If empty, "+
@@ -84,18 +68,18 @@ func main() {
 		"environment variable")
 	flag.Parse()
 
-	if *forceAsInteractive {
-		isInteractive = true
-	}
-
-	vswitchName := strings.Replace(*vswitchNameWildcard, "<adapter>", *adapter, -1)
-
 	logHook, err := logging.SetupHook(*logPath, *logLevelString)
 	if err != nil {
 		log.Errorf("Setting up logging failed: %s", err)
 		return
 	}
 	defer logHook.Close()
+
+	if *forceAsInteractive {
+		log.Warnln("forceAsInteractive is deprecated.")
+	}
+
+	vswitchName := strings.Replace(*vswitchNameWildcard, "<adapter>", *adapter, -1)
 
 	keys := &auth.KeystoneParams{
 		Os_auth_url:    *os_auth_url,
@@ -106,43 +90,16 @@ func main() {
 	}
 	keys.LoadFromEnvironment()
 
-	winService := &WinService{
-		adapter:        *adapter,
-		controllerIP:   *controllerIP,
-		controllerPort: *controllerPort,
-		agentURL:       *agentURL,
-		vswitchName:    vswitchName,
-		keys:           *keys,
-	}
-
-	svcRunFunc := debug.Run
-	if !isInteractive {
-		svcRunFunc = svc.Run
-	}
-
-	if err := svcRunFunc(common.WinServiceName, winService); err != nil {
-		log.Errorf("%s service failed: %v", common.WinServiceName, err)
-		return
-	}
-	log.Infof("%s service stopped", common.WinServiceName)
-}
-
-func (ws *WinService) Execute(args []string, winChangeReqChan <-chan svc.ChangeRequest,
-	winStatusChan chan<- svc.Status) (ssec bool, errno uint32) {
-
-	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
-	winStatusChan <- svc.Status{State: svc.StartPending}
-
-	hypervExtension := hyperv_extension.NewHyperVvRouterForwardingExtension(ws.vswitchName)
+	hypervExtension := hyperv_extension.NewHyperVvRouterForwardingExtension(vswitchName)
 	vrouter := vrouter.NewHyperVvRouter(hypervExtension)
 
-	controller, err := controller_rest.NewControllerWithKeystoneAdapter(&ws.keys, ws.controllerIP, ws.controllerPort)
+	controller, err := controller_rest.NewControllerWithKeystoneAdapter(keys, *controllerIP, *controllerPort)
 	if err != nil {
 		log.Error(err)
 		return
 	}
 
-	agentUrl, err := url.Parse(ws.agentURL)
+	agentUrl, err := url.Parse(*agentURL)
 	if err != nil {
 		log.Error(err)
 		return
@@ -150,7 +107,7 @@ func (ws *WinService) Execute(args []string, winChangeReqChan <-chan svc.ChangeR
 
 	agent := agent.NewAgentRestAPI(http.DefaultClient, agentUrl)
 
-	netRepo, err := hns.NewHNSContrailNetworksRepository(common.AdapterName(ws.adapter))
+	netRepo, err := hns.NewHNSContrailNetworksRepository(common.AdapterName(*adapter))
 
 	epRepo := &hns.HNSEndpointRepository{}
 
@@ -167,24 +124,12 @@ func (ws *WinService) Execute(args []string, winChangeReqChan <-chan svc.ChangeR
 	}
 	defer d.StopServing()
 
-	winStatusChan <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
+	waitForSigInt()
+}
 
-win_svc_loop:
-	for {
-		svcCmd := <-winChangeReqChan
-
-		switch svcCmd.Cmd {
-		case svc.Interrogate:
-			winStatusChan <- svcCmd.CurrentStatus
-			// Testing deadlock from https://code.google.com/p/winsvc/issues/detail?id=4
-			time.Sleep(100 * time.Millisecond)
-			winStatusChan <- svcCmd.CurrentStatus
-		case svc.Stop, svc.Shutdown:
-			break win_svc_loop
-		default:
-			log.Errorf("Unexpected control request #%d", svcCmd)
-		}
-	}
-	winStatusChan <- svc.Status{State: svc.StopPending}
-	return
+func waitForSigInt() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	<-c
+	log.Infoln("Good bye")
 }

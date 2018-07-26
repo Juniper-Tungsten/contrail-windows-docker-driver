@@ -124,7 +124,7 @@
 
 [[projects]]
   name = "golang.org/x/sys"
-  packages = ["unix","windows","windows/svc","windows/svc/debug"]
+  packages = ["unix","windows"]
   revision = "062cd7e4e68206d8bab9b18396626e855c992658"
 
 [[projects]]
