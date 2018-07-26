@@ -29,11 +29,10 @@ import (
 )
 
 type ContrailDriverCore struct {
-	vrouter ports.VRouter
-	// TODO: all these fields below should be made private as we remove the need for them in
-	// driver package.
-	controller                 ports.Controller
-	PortAssociation            ports.PortAssociation
+	vrouter         ports.VRouter
+	controller      ports.Controller
+	portAssociation ports.PortAssociation
+	// TODO: all these fields below should be made private eventually
 	LocalContrailNetworksRepo  ports.LocalContrailNetworkRepository
 	LocalContrailEndpointsRepo ports.LocalContrailEndpointRepository
 }
@@ -44,7 +43,7 @@ func NewContrailDriverCore(vr ports.VRouter, c ports.Controller, a ports.PortAss
 	core := ContrailDriverCore{
 		vrouter:                    vr,
 		controller:                 c,
-		PortAssociation:            a,
+		portAssociation:            a,
 		LocalContrailNetworksRepo:  nr,
 		LocalContrailEndpointsRepo: er,
 	}
@@ -157,7 +156,7 @@ func (core *ContrailDriverCore) createContainerEndpointInLocalNetwork(container 
 
 func (core *ContrailDriverCore) associatePort(container *model.Container, ep *model.LocalEndpoint) {
 	go func() {
-		err := core.PortAssociation.AddPort(container.VmUUID, container.VmiUUID, ep.IfName,
+		err := core.portAssociation.AddPort(container.VmUUID, container.VmiUUID, ep.IfName,
 			container.Mac, ep.Name, container.IP.String(), container.NetUUID)
 		if err != nil {
 			log.Error(err.Error())
@@ -168,7 +167,7 @@ func (core *ContrailDriverCore) associatePort(container *model.Container, ep *mo
 
 func (core *ContrailDriverCore) disassociatePort(container *model.Container) {
 	go func() {
-		err := core.PortAssociation.DeletePort(container.VmiUUID)
+		err := core.portAssociation.DeletePort(container.VmiUUID)
 		if err != nil {
 			log.Error(err.Error())
 		}
