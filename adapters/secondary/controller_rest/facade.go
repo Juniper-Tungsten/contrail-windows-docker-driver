@@ -94,10 +94,7 @@ func (c *ControllerAdapter) CreateContainerInSubnet(network *model.Network, cont
 		return nil, err
 	}
 	ip := ipobj.GetInstanceIpAddress()
-	log.Debugln("Retrieved instance IP:", ip)
-
 	mac, err := c.controller.GetInterfaceMac(vif)
-	log.Debugln("Retrieved MAC:", mac)
 	if err != nil {
 		return nil, err
 	}
@@ -117,6 +114,7 @@ func (c *ControllerAdapter) CreateContainerInSubnet(network *model.Network, cont
 		NetUUID:   retreivedNetwork.GetUuid(),
 	}
 
+	log.Debugln("Container:", container)
 	return container, nil
 }
 
@@ -130,4 +128,85 @@ func (c *ControllerAdapter) GetExistingInterface(net *types.VirtualNetwork, tena
 
 func (c *ControllerAdapter) DeleteContainer(containerID string) error {
 	return c.controller.DeleteContainer(containerID)
+}
+
+func (c *ControllerAdapter) GetContainer(containerID string) (*model.Container, error) {
+
+	vm, err := c.controller.GetInstance(containerID)
+	if err != nil {
+		return nil, err
+	}
+
+	// one endpoint supported for now
+	vmiRefs, err := vm.GetVirtualMachineInterfaceBackRefs()
+	if err != nil {
+		return nil, err
+	}
+	vmiObj, err := c.controller.ApiClient.FindByUuid("virtual-machine-interface", vmiRefs[0].Uuid)
+	if err != nil {
+		return nil, err
+	}
+	vmi := vmiObj.(*types.VirtualMachineInterface)
+
+	// one instance ip per endpoint supported for now
+	iipRefs, err := vmi.GetInstanceIpBackRefs()
+	if err != nil {
+		return nil, err
+	}
+	iipObj, err := c.controller.ApiClient.FindByUuid("instance-ip", iipRefs[0].Uuid)
+	if err != nil {
+		return nil, err
+	}
+	iip := iipObj.(*types.InstanceIp)
+
+	// one network per vmi supported for now
+	vnRefs, err := iip.GetVirtualNetworkRefs()
+	if err != nil {
+		return nil, err
+	}
+	vnObj, err := c.controller.ApiClient.FindByUuid("virtual-network", vnRefs[0].Uuid)
+	if err != nil {
+		return nil, err
+	}
+	vn := vnObj.(*types.VirtualNetwork)
+
+	subnet, err := c.findSubnetInNetworkByInstanceIP(iip, vn)
+	if err != nil {
+		return nil, err
+	}
+
+	mac, err := c.controller.GetInterfaceMac(vmi)
+	if err != nil {
+		return nil, err
+	}
+
+	container := &model.Container{
+		IP:        net.ParseIP(iip.GetInstanceIpAddress()),
+		PrefixLen: subnet.Subnet.IpPrefixLen,
+		Mac:       mac,
+		Gateway:   subnet.DefaultGateway,
+		VmUUID:    vm.GetUuid(),
+		VmiUUID:   vmi.GetUuid(),
+		NetUUID:   vn.GetUuid(),
+	}
+
+	log.Debugln("Container:", container)
+	return container, nil
+}
+
+func (c *ControllerAdapter) findSubnetInNetworkByInstanceIP(iip *types.InstanceIp, vn *types.VirtualNetwork) (*types.IpamSubnetType, error) {
+	subnetUuidToFind := iip.GetSubnetUuid()
+	ipamRefs, err := vn.GetNetworkIpamRefs()
+	if err != nil {
+		return nil, err
+	}
+	for idx, _ := range ipamRefs {
+		subnets := ipamRefs[idx].Attr.(types.VnSubnetsType).IpamSubnets
+		for idx, _ := range subnets {
+			if subnets[idx].SubnetUuid == subnetUuidToFind {
+				return &subnets[idx], nil
+			}
+		}
+	}
+	return nil, errors.New("Subnet not found")
 }

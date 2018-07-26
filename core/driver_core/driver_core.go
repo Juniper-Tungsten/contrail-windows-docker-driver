@@ -23,10 +23,6 @@ import (
 	"fmt"
 	"strings"
 
-	// TODO: this import should be removed when making Controller port smaller
-
-	// TODO: this import should be removed
-
 	"github.com/Juniper/contrail-windows-docker-driver/core/model"
 	"github.com/Juniper/contrail-windows-docker-driver/core/ports"
 	log "github.com/sirupsen/logrus"
@@ -36,7 +32,7 @@ type ContrailDriverCore struct {
 	vrouter ports.VRouter
 	// TODO: all these fields below should be made private as we remove the need for them in
 	// driver package.
-	Controller                 ports.Controller
+	controller                 ports.Controller
 	PortAssociation            ports.PortAssociation
 	LocalContrailNetworksRepo  ports.LocalContrailNetworkRepository
 	LocalContrailEndpointsRepo ports.LocalContrailEndpointRepository
@@ -47,7 +43,7 @@ func NewContrailDriverCore(vr ports.VRouter, c ports.Controller, a ports.PortAss
 	er ports.LocalContrailEndpointRepository) (*ContrailDriverCore, error) {
 	core := ContrailDriverCore{
 		vrouter:                    vr,
-		Controller:                 c,
+		controller:                 c,
 		PortAssociation:            a,
 		LocalContrailNetworksRepo:  nr,
 		LocalContrailEndpointsRepo: er,
@@ -63,7 +59,7 @@ func (core *ContrailDriverCore) initializeAdapters() error {
 }
 
 func (core *ContrailDriverCore) CreateNetwork(dockerNetID, tenantName, networkName, subnetCIDR string) error {
-	network, err := core.Controller.GetNetworkWithSubnet(tenantName, networkName, subnetCIDR)
+	network, err := core.controller.GetNetworkWithSubnet(tenantName, networkName, subnetCIDR)
 	if err != nil {
 		return err
 	}
@@ -91,19 +87,14 @@ func (core *ContrailDriverCore) DeleteNetwork(dockerNetID string) error {
 
 func (core *ContrailDriverCore) CreateEndpoint(dockerNetID, endpointID string) (*model.Container, error) {
 
+	containerID := core.getIdOfContainerWithEndpoint(endpointID)
+
 	network, err := core.LocalContrailNetworksRepo.GetNetwork(dockerNetID)
 	if err != nil {
 		return nil, err
 	}
 
-	// WORKAROUND: We need to retreive Container ID here and use it instead of EndpointID as
-	// argument to GetOrCreateInstance(). EndpointID is equiv to interface, but in Contrail,
-	// we have a "VirtualMachine" in data model. A single VM can be connected to two or more
-	// overlay networks, but when we use EndpointID, this won't work. We need something like:
-	// containerID := req.Options["vmname"]
-	containerID := endpointID
-
-	container, err := core.Controller.CreateContainerInSubnet(network, containerID)
+	container, err := core.controller.CreateContainerInSubnet(network, containerID)
 	if err != nil {
 		return nil, err
 	}
@@ -113,14 +104,38 @@ func (core *ContrailDriverCore) CreateEndpoint(dockerNetID, endpointID string) (
 		return nil, err
 	}
 
-	go func() {
-		err := core.associatePort(container, localEndpoint)
-		if err != nil {
-			log.Error(err.Error())
-		}
-		log.Debugln("CreateEndpoint: core.associatePort done for ", container)
-	}()
+	core.associatePort(container, localEndpoint)
+
 	return container, nil
+}
+
+func (core *ContrailDriverCore) DeleteEndpoint(dockerNetID, endpointID string) error {
+
+	containerID := core.getIdOfContainerWithEndpoint(endpointID)
+
+	container, err := core.controller.GetContainer(endpointID)
+	if err != nil {
+		return err
+	}
+
+	core.disassociatePort(container)
+
+	err = core.controller.DeleteContainer(containerID)
+	if err != nil {
+		log.Warn("When handling DeleteEndpoint, failed to remove Contrail vm instance. Continuing.")
+	}
+
+	return core.LocalContrailEndpointsRepo.DeleteEndpoint(endpointID)
+}
+
+func (core *ContrailDriverCore) getIdOfContainerWithEndpoint(endpointID string) string {
+	// WORKAROUND: We need to retreive Container ID here and use it instead of EndpointID as
+	// argument to GetOrCreateInstance(). EndpointID is equiv to interface, but in Contrail,
+	// we have a "VirtualMachine" in data model. A single VM can be connected to two or more
+	// overlay networks, but when we use EndpointID, this won't work. We need something like:
+	// containerID := req.Options["vmname"]
+	containerID := endpointID
+	return containerID
 }
 
 func (core *ContrailDriverCore) createContainerEndpointInLocalNetwork(container *model.Container, network *model.Network, name string) (*model.LocalEndpoint, error) {
@@ -140,55 +155,25 @@ func (core *ContrailDriverCore) createContainerEndpointInLocalNetwork(container 
 	return ep, nil
 }
 
-func (core *ContrailDriverCore) associatePort(container *model.Container, ep *model.LocalEndpoint) error {
-	return core.PortAssociation.AddPort(container.VmUUID, container.VmiUUID, ep.IfName,
-		container.Mac, ep.Name, container.IP.String(), container.NetUUID)
+func (core *ContrailDriverCore) associatePort(container *model.Container, ep *model.LocalEndpoint) {
+	go func() {
+		err := core.PortAssociation.AddPort(container.VmUUID, container.VmiUUID, ep.IfName,
+			container.Mac, ep.Name, container.IP.String(), container.NetUUID)
+		if err != nil {
+			log.Error(err.Error())
+		}
+		log.Debugln("core.associatePort done for", container, ep)
+	}()
 }
 
-func (core *ContrailDriverCore) DeleteEndpoint(dockerNetID, endpointID string) error {
-
-	network, err := core.LocalContrailNetworksRepo.GetNetwork(dockerNetID)
-	if err != nil {
-		return err
-	}
-
-	contrailNetwork, err := core.Controller.GetNetwork(network.TenantName, network.NetworkName)
-	if err != nil {
-		return err
-	}
-	log.Infoln("Retrieved Contrail network:", contrailNetwork.GetUuid())
-
-	// WORKAROUND: We need to retreive Container ID here and use it instead of EndpointID as
-	// argument to GetOrCreateInstance(). EndpointID is equiv to interface, but in Contrail,
-	// we have a "VirtualMachine" in data model. A single VM can be connected to two or more
-	// overlay networks, but when we use EndpointID, this won't work. We need something like:
-	// containerID := req.Options["vmname"]
-	containerID := endpointID
-
-	contrailVif, err := core.Controller.GetExistingInterface(contrailNetwork,
-		network.TenantName, containerID)
-	if err != nil {
-		return err
-	}
-
-	vifUUID := contrailVif.GetUuid()
-	if err != nil {
-		log.Warn("When handling DeleteEndpoint, interface wasn't found")
-	} else {
-		go func() {
-			err := core.PortAssociation.DeletePort(vifUUID)
-			if err != nil {
-				log.Error(err.Error())
-			}
-		}()
-	}
-
-	err = core.Controller.DeleteContainer(containerID)
-	if err != nil {
-		log.Warn("When handling DeleteEndpoint, failed to remove Contrail vm instance")
-	}
-
-	return core.LocalContrailEndpointsRepo.DeleteEndpoint(endpointID)
+func (core *ContrailDriverCore) disassociatePort(container *model.Container) {
+	go func() {
+		err := core.PortAssociation.DeletePort(container.VmiUUID)
+		if err != nil {
+			log.Error(err.Error())
+		}
+		log.Debugln("core.disassociatePort done for", container)
+	}()
 }
 
 func (core *ContrailDriverCore) generateFriendlyName(hnsEndpointID string) string {

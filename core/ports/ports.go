@@ -50,6 +50,7 @@ type Controller interface {
 
 	CreateContainerInSubnet(net *model.Network, containerID string) (*model.Container, error)
 	DeleteContainer(containerID string) error
+	GetContainer(containerID string) (*model.Container, error)
 
 	// This method is only used by tests; to remove?
 	NewProject(domain, tenant string) (*types.Project, error)
