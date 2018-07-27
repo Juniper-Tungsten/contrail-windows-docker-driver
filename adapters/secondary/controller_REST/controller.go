@@ -18,8 +18,10 @@ package controller_rest
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
+	"strconv"
 
 	contrail "github.com/Juniper/contrail-go-api"
 	"github.com/Juniper/contrail-go-api/config"
@@ -188,7 +190,7 @@ func (c *ControllerAdapterImpl) GetOrCreateInstance(vif *types.VirtualMachineInt
 	instance, err := c.GetInstance(containerId)
 	if err == nil {
 		return instance, nil
-	} else if !c.is404(err) {
+	} else if !c.isResourceNotFound(err) {
 		log.Errorf("Failed to get instance: %v", err)
 		return nil, err
 	}
@@ -340,8 +342,7 @@ func (c *ControllerAdapterImpl) GetOrCreateInstanceIp(net *types.VirtualNetwork,
 func (c *ControllerAdapterImpl) DeleteElementRecursive(parent contrail.IObject) error {
 	log.Debugln("Deleting", parent.GetType(), parent.GetUuid())
 	for err := c.ApiClient.Delete(parent); err != nil; err = c.ApiClient.Delete(parent) {
-		// TODO: when fixing this method, consider using c.is404() method.
-		if strings.Contains(err.Error(), "404 Resource") {
+		if c.isResourceNotFound(err) {
 			log.Errorln("Failed to delete Contrail resource", err.Error())
 			break
 		} else if strings.Contains(err.Error(), "409 Conflict") {
@@ -382,6 +383,6 @@ func (c *ControllerAdapterImpl) DeleteElementRecursive(parent contrail.IObject) 
 	return nil
 }
 
-func (c *ControllerAdapterImpl) is404(err error) bool {
-	return strings.HasPrefix(err.Error(), "404")
+func (c *ControllerAdapterImpl) isResourceNotFound(err error) bool {
+	return strings.HasPrefix(err.Error(), strconv.Itoa(http.StatusNotFound))
 }
