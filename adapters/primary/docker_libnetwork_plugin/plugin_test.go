@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -47,7 +46,6 @@ import (
 	"github.com/docker/go-connections/sockets"
 	"github.com/docker/go-plugins-helpers/network"
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/ginkgo/extensions/table"
 	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
 	log "github.com/sirupsen/logrus"
@@ -239,565 +237,211 @@ var _ = Describe("Contrail Network Driver", func() {
 	})
 })
 
-// TODO: This Describe block is probably to be removed. The only thing we want to test here is json
-// marshalling of docker requests probably. Handlers logic is going to be tested in Core, after all.
-var _ = PDescribe("On requests from docker daemon", func() {
-
-	var docker *dockerClient.Client
-
-	BeforeEach(func() {
-		fakeVRouter, server, contrailController, localContrailNetworksRepo, project = newIntegrationModulesUnderTest()
-
-		err := server.StartServing()
-		Expect(err).ToNot(HaveOccurred())
-
-		docker = getDockerClient()
-	})
-	AfterEach(func() {
-		cleanupAllDockerNetworksAndContainers(docker)
-		err := common.RestartDocker()
-		Expect(err).ToNot(HaveOccurred())
-
-		err = server.StopServing()
-		Expect(err).ToNot(HaveOccurred())
-
-		err = common.HardResetHNS()
-		Expect(err).ToNot(HaveOccurred())
-
-		err = win_networking.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	Context("on GetCapabilities request", func() {
-		It("returns local scope CapabilitiesResponse, nil", func() {
-			resp, err := server.GetCapabilities()
-			Expect(resp).To(Equal(&network.CapabilitiesResponse{Scope: "local"}))
-			Expect(err).ToNot(HaveOccurred())
-		})
-	})
-
-	Context("on CreateNetwork request", func() {
-
-		var req *network.CreateNetworkRequest
-		var genericOptions map[string]interface{}
-
+var _ = Describe("On requests from docker daemon", func() {
+	Context("Requests that are handled by core driver logic", func() {
 		BeforeEach(func() {
-			ipamData := []*network.IPAMData{
-				{
-					Pool: subnetCIDR,
-				},
-			}
-			req = &network.CreateNetworkRequest{
-				NetworkID: "MyAwesomeNet",
-				Options:   make(map[string]interface{}),
-				IPv4Data:  ipamData,
-			}
-			genericOptions = make(map[string]interface{})
+			// TODO: write these tests sometime - maybe when implementing hanlding of
+			// security groups and non-default domains?
+			// server = newIntegrationModulesUnderTest()
 		})
-		type TestCase struct {
-			tenant  string
-			network string
-		}
-		DescribeTable("with different, invalid options",
-			func(t TestCase) {
-				if t.tenant != "" {
-					genericOptions["tenant"] = t.tenant
-				}
-				if t.network != "" {
-					genericOptions["network"] = t.network
-				}
-				req.Options["com.docker.network.generic"] = genericOptions
-				err := server.CreateNetwork(req)
-				Expect(err).To(HaveOccurred())
-			},
-			Entry("subnet doesn't exist in Contrail", TestCase{
-				tenant:  tenantName,
-				network: "nonexistingNetwork",
-			}),
-			Entry("tenant doesn't exist in Contrail", TestCase{
-				tenant:  "nonexistingTenant",
-				network: networkName,
-			}),
-			Entry("tenant is not specified in request Options", TestCase{
-				network: networkName,
-			}),
-			Entry("network is not specified in request Options", TestCase{
-				tenant: tenantName,
-			}),
-		)
+		Context("on CreateNetwork request", func() {
+			PIt("TODO: parameter validation tests", func() {})
+		})
 
-		Context("tenant and subnet exist in Contrail", func() {
-			BeforeEach(func() {
-				_ = createTestContrailNetwork(contrailController)
+		Context("on DeleteNetwork request", func() {
+			PIt("TODO: parameter validation tests", func() {})
+		})
 
-				genericOptions["network"] = networkName
-				genericOptions["tenant"] = tenantName
-				req.Options["com.docker.network.generic"] = genericOptions
+		Context("on CreateEndpoint request", func() {
+			PIt("TODO: parameter validation tests", func() {})
+		})
+
+		PContext("on DeleteEndpoint request", func() {
+			PIt("TODO: parameter validation tests", func() {})
+		})
+	})
+
+	Context("Requests that core logic does not really car&e about", func() {
+		BeforeEach(func() {
+			// These functions shouldn't use core logic in any way, so let's just pass an empty
+			// structure.
+			nullCore := driver_core.ContrailDriverCore{}
+			server = docker_libnetwork_plugin.NewDockerPluginServer(&nullCore)
+		})
+		Context("on GetCapabilities request", func() {
+			It("returns local scope CapabilitiesResponse, nil", func() {
+				resp, err := server.GetCapabilities()
+				Expect(resp).To(Equal(&network.CapabilitiesResponse{Scope: "local"}))
+				Expect(err).ToNot(HaveOccurred())
 			})
+		})
+
+		Context("on AllocateNetwork request", func() {
+			It("responds with not implemented error", func() {
+				req := network.AllocateNetworkRequest{}
+				_, err := server.AllocateNetwork(&req)
+				Expect(err).To(HaveOccurred())
+			})
+		})
+
+		Context("on FreeNetwork request", func() {
+			It("responds with not implemented error", func() {
+				req := network.FreeNetworkRequest{}
+				err := server.FreeNetwork(&req)
+				Expect(err).To(HaveOccurred())
+			})
+		})
+
+		// TODO: EndpointInfo, Join, Leave tests required docker daemon to ran in the past.
+		// Refactor when refactoring those requests in core.
+
+		// Context("on EndpointInfo request", func() {
+
+		// 	dockerNetID := ""
+		// 	containerID := ""
+		// 	var req *network.InfoRequest
+
+		// 	BeforeEach(func() {
+		// 		_, dockerNetID, containerID = setupNetworksAndEndpoints(contrailController, docker)
+		// 		dockerNet, err := getDockerNetwork(docker, dockerNetID)
+		// 		Expect(err).ToNot(HaveOccurred())
+		// 		req = &network.InfoRequest{
+		// 			NetworkID:  dockerNetID,
+		// 			EndpointID: dockerNet.Containers[containerID].EndpointID,
+		// 		}
+		// 	})
+
+		// 	Context("queried endpoint exists", func() {
+		// 		It("responds with proper InfoResponse", func() {
+		// 			resp, err := server.EndpointInfo(req)
+		// 			Expect(err).ToNot(HaveOccurred())
+
+		// 			hnsEndpoint, _ := getTheOnlyHNSEndpoint(server)
+		// 			Expect(resp.Value).To(HaveKeyWithValue("hnsid", hnsEndpoint.Id))
+		// 			Expect(resp.Value).To(HaveKeyWithValue(
+		// 				"com.docker.network.endpoint.macaddress", hnsEndpoint.MacAddress))
+		// 		})
+		// 	})
+
+		// 	Context("queried endpoint doesn't exist", func() {
+		// 		BeforeEach(func() {
+		// 			deleteTheOnlyHNSEndpoint(server)
+		// 		})
+		// 		It("responds with err", func() {
+		// 			_, err := server.EndpointInfo(req)
+		// 			Expect(err).To(HaveOccurred())
+		// 		})
+		// 	})
+		// })
+
+		// Context("on Join request", func() {
+
+		// 	dockerNetID := ""
+		// 	containerID := ""
+		// 	var req *network.JoinRequest
+
+		// 	BeforeEach(func() {
+		// 		_, dockerNetID, containerID = setupNetworksAndEndpoints(contrailController, docker)
+		// 		dockerNet, err := getDockerNetwork(docker, dockerNetID)
+		// 		Expect(err).ToNot(HaveOccurred())
+		// 		req = &network.JoinRequest{
+		// 			NetworkID:  dockerNetID,
+		// 			EndpointID: dockerNet.Containers[containerID].EndpointID,
+		// 		}
+		// 	})
+
+		// 	Context("queried endpoint exists", func() {
+		// 		It("responds with valid gateway IP and disabled gw service", func() {
+		// 			resp, err := server.Join(req)
+		// 			Expect(err).ToNot(HaveOccurred())
+		// 			Expect(resp.DisableGatewayService).To(BeTrue())
+
+		// 			contrailNet, err := contrailController.GetNetwork(tenantName, networkName)
+		// 			Expect(err).ToNot(HaveOccurred())
+		// 			ipams, err := contrailNet.GetNetworkIpamRefs()
+		// 			Expect(err).ToNot(HaveOccurred())
+		// 			subnets := ipams[0].Attr.(types.VnSubnetsType).IpamSubnets
+		// 			contrailGW := subnets[0].DefaultGateway
+
+		// 			Expect(resp.Gateway).To(Equal(contrailGW))
+		// 		})
+		// 	})
+
+		// 	Context("queried endpoint doesn't exist", func() {
+		// 		BeforeEach(func() {
+		// 			deleteTheOnlyHNSEndpoint(server)
+		// 		})
+		// 		It("responds with err", func() {
+		// 			_, err := server.Join(req)
+		// 			Expect(err).To(HaveOccurred())
+		// 		})
+		// 	})
+		// })
+
+		// Context("on Leave request", func() {
+
+		// 	dockerNetID := ""
+		// 	containerID := ""
+		// 	var req *network.LeaveRequest
+
+		// 	BeforeEach(func() {
+		// 		_, dockerNetID, containerID = setupNetworksAndEndpoints(contrailController, docker)
+		// 		dockerNet, err := getDockerNetwork(docker, dockerNetID)
+		// 		Expect(err).ToNot(HaveOccurred())
+		// 		req = &network.LeaveRequest{
+		// 			NetworkID:  dockerNetID,
+		// 			EndpointID: dockerNet.Containers[containerID].EndpointID,
+		// 		}
+		// 	})
+
+		// 	Context("queried endpoint exists", func() {
+		// 		It("responds with nil", func() {
+		// 			err := server.Leave(req)
+		// 			Expect(err).ToNot(HaveOccurred())
+		// 		})
+		// 	})
+
+		// 	Context("queried endpoint doesn't exist", func() {
+		// 		BeforeEach(func() {
+		// 			deleteTheOnlyHNSEndpoint(server)
+		// 		})
+		// 		It("responds with err", func() {
+		// 			err := server.Leave(req)
+		// 			Expect(err).To(HaveOccurred())
+		// 		})
+		// 	})
+		// })
+
+		Context("on DiscoverNew request", func() {
 			It("responds with nil", func() {
-				err := server.CreateNetwork(req)
+				req := network.DiscoveryNotification{}
+				err := server.DiscoverNew(&req)
 				Expect(err).ToNot(HaveOccurred())
 			})
-			It("creates a HNS network", func() {
-				netsBefore, err := hns.ListHNSNetworks()
-				Expect(err).ToNot(HaveOccurred())
-
-				err = server.CreateNetwork(req)
-				Expect(err).ToNot(HaveOccurred())
-
-				netsAfter, err := hns.ListHNSNetworks()
-				Expect(err).ToNot(HaveOccurred())
-				Expect(netsBefore).To(HaveLen(len(netsAfter) - 1))
-			})
-		})
-	})
-
-	Context("on AllocateNetwork request", func() {
-		It("responds with not implemented error", func() {
-			req := network.AllocateNetworkRequest{}
-			_, err := server.AllocateNetwork(&req)
-			Expect(err).To(HaveOccurred())
-		})
-	})
-
-	Context("on DeleteNetwork request", func() {
-
-		dockerNetID := ""
-		var contrailNet *types.VirtualNetwork
-
-		assertRemovesHNSNet := func() {
-			resp, err := localContrailNetworksRepo.GetNetwork(dockerNetID)
-			Expect(err).To(HaveOccurred())
-			Expect(resp).To(BeNil())
-		}
-		assertRemovesDockerNet := func() {
-			_, err := getDockerNetwork(docker, dockerNetID)
-			Expect(err).To(HaveOccurred())
-		}
-		assertDoesNotRemoveContrailNet := func() {
-			// TODO: This test must be rewritten using Controller interface.
-			// In other words, it mustn't access ApiClient field.
-
-			// 	net, err := types.VirtualNetworkByName(contrailController.ApiClient,
-			// 		fmt.Sprintf("%s:%s:%s", common.DomainName, tenantName,
-			// 			networkName))
-			// 	Expect(err).ToNot(HaveOccurred())
-			// 	Expect(net).ToNot(BeNil())
-		}
-
-		BeforeEach(func() {
-			contrailNet = createTestContrailNetwork(contrailController)
-			dockerNetID = createValidDockerNetwork(docker)
 		})
 
-		Context("docker, Contrail and HNS networks are fine", func() {
-			BeforeEach(func() {
-				err := removeDockerNetwork(docker, dockerNetID)
-				Expect(err).ToNot(HaveOccurred())
-			})
-			It("removes HNS net", assertRemovesHNSNet)
-			It("removes docker net", assertRemovesDockerNet)
-			PIt("does not remove Contrail net", assertDoesNotRemoveContrailNet)
-		})
-
-		Context("HNS network doesn't exist", func() {
-			// for example, HNS was hard-reset while docker wasn't.
-			BeforeEach(func() {
-				localContrailNetworksRepo.DeleteNetwork(dockerNetID)
-				err := removeDockerNetwork(docker, dockerNetID)
-				Expect(err).ToNot(HaveOccurred())
-			})
-			It("removes docker net", assertRemovesDockerNet)
-			PIt("does not remove Contrail net", assertDoesNotRemoveContrailNet)
-		})
-
-		Context("Contrail network doesn't exist", func() {
-			// for example, somebody deleted Contrail network before removing HNS network
-			BeforeEach(func() {
-				err := contrailController.DeleteElementRecursive(contrailNet)
-				Expect(err).ToNot(HaveOccurred())
-				err = removeDockerNetwork(docker, dockerNetID)
-				Expect(err).ToNot(HaveOccurred())
-			})
-			It("removes HNS net", assertRemovesHNSNet)
-			It("removes docker net", assertRemovesDockerNet)
-		})
-	})
-
-	Context("on FreeNetwork request", func() {
-		It("responds with not implemented error", func() {
-			req := network.FreeNetworkRequest{}
-			err := server.FreeNetwork(&req)
-			Expect(err).To(HaveOccurred())
-		})
-	})
-
-	Context("on CreateEndpoint request", func() {
-		dockerNetID := ""
-
-		Context("Contrail, docker and HNS networks exist", func() {
-
-			containerID := ""
-
-			var mockAgentListener *OneTimeListener
-
-			BeforeEach(func() {
-				mockAgentListener = startMockAgentListener()
-				_, dockerNetID, containerID = setupNetworksAndEndpoints(contrailController, docker)
-			})
-			AfterEach(func(done Done) {
-				// Done channel is ginkgo feature for setting timeouts
-				// https://onsi.github.io/ginkgo/#asynchronous-tests
-				log.Debugln("Waiting for request")
-				<-mockAgentListener.Received
-				log.Debugln("Done waiting for request")
-
-				mockAgentListener.Close()
-				mockAgentListener = nil
-				close(done)
-			})
-			PIt("allocates Contrail resources", func() {
-				// TODO: This test must be rewritten using Controller interface.
-				// In other words, it mustn't access ApiClient field.
-
-				// 	net, err := types.VirtualNetworkByName(contrailController.ApiClient,
-				// 		fmt.Sprintf("%s:%s:%s", common.DomainName, tenantName, networkName))
-				// 	Expect(err).ToNot(HaveOccurred())
-				// 	Expect(net).ToNot(BeNil())
-
-				// 	// TODO JW-187. For now, VM name is the same as Endpoint ID, not
-				// 	// Container ID
-				// 	dockerNet, err := getDockerNetwork(docker, dockerNetID)
-				// 	Expect(err).ToNot(HaveOccurred())
-				// 	vmName := dockerNet.Containers[containerID].EndpointID
-
-				// 	inst, err := types.VirtualMachineByName(contrailController.ApiClient, vmName)
-				// 	Expect(err).ToNot(HaveOccurred())
-				// 	Expect(inst).ToNot(BeNil())
-
-				// 	vifFQName := fmt.Sprintf("%s:%s:%s", common.DomainName, tenantName, vmName)
-				// 	vif, err := types.VirtualMachineInterfaceByName(contrailController.ApiClient,
-				// 		vifFQName)
-				// 	Expect(err).ToNot(HaveOccurred())
-				// 	Expect(vif).ToNot(BeNil())
-
-				// 	ip, err := types.InstanceIpByName(contrailController.ApiClient, vif.GetName())
-				// 	Expect(err).ToNot(HaveOccurred())
-				// 	Expect(ip).ToNot(BeNil())
-
-				// 	ipams, err := net.GetNetworkIpamRefs()
-				// 	Expect(err).ToNot(HaveOccurred())
-				// 	subnets := ipams[0].Attr.(types.VnSubnetsType).IpamSubnets
-				// 	gw := subnets[0].DefaultGateway
-				// 	Expect(gw).ToNot(Equal(""))
-
-				// 	macs := vif.GetVirtualMachineInterfaceMacAddresses()
-				// 	Expect(macs.MacAddress).To(HaveLen(1))
-			})
-			It("configures HNS endpoint", func() {
-				resp, err := docker.ContainerInspect(context.Background(), containerID)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(resp).ToNot(BeNil())
-				ip := resp.NetworkSettings.Networks[networkName].IPAddress
-				mac := resp.NetworkSettings.Networks[networkName].MacAddress
-				gw := resp.NetworkSettings.Networks[networkName].Gateway
-
-				ep, _ := getTheOnlyHNSEndpoint(server)
-				Expect(ep.IPAddress.String()).To(Equal(ip))
-				formattedMac := strings.Replace(strings.ToUpper(mac), ":", "-", -1)
-				Expect(ep.MacAddress).To(Equal(formattedMac))
-				Expect(ep.GatewayAddress).To(Equal(gw))
-			})
-		})
-
-		Context("Contrail and docker networks exists, HNS network doesn't", func() {
-			// for example, HNS was hard-reset while docker wasn't.
-			containerID := ""
-
-			BeforeEach(func() {
-				_ = createTestContrailNetwork(contrailController)
-				_ = createValidDockerNetwork(docker)
-
-				localContrailNetworksRepo.DeleteNetwork(dockerNetID)
-			})
-			It("responds with err", func() {
-				var err error
-				containerID, err = runDockerContainer(docker)
-				Expect(err).To(HaveOccurred())
-			})
-		})
-
-		Context("Contrail network exists, docker network doesn't", func() {
-			BeforeEach(func() {
-				_ = createTestContrailNetwork(contrailController)
-			})
-			It("responds with err", func() {
-				req := &network.CreateEndpointRequest{
-					EndpointID: "somecontainerID",
-				}
-				_, err := server.CreateEndpoint(req)
-				Expect(err).To(HaveOccurred())
-			})
-		})
-	})
-
-	// TODO: This Context is marked as Pending, because BeforeEach block must be
-	// rewritten using Controller interface.
-	PContext("on DeleteEndpoint request", func() {
-
-		// dockerNetID := ""
-		containerID := ""
-		hnsEndpointID := ""
-		// vmName := ""
-		var contrailInst *types.VirtualMachine
-		// var contrailVif *types.VirtualMachineInterface
-		// var contrailIP *types.InstanceIp
-		var mockAgentListener *OneTimeListener
-
-		BeforeEach(func() {
-			// TODO: This BeforeEach must be rewritten using Controller interface.
-			// In other words, it mustn't access ApiClient field.
-
-			// mockAgentListener = startMockAgentListener()
-			// _, dockerNetID, containerID = setupNetworksAndEndpoints(contrailController, docker)
-			// _, hnsEndpointID = getTheOnlyHNSEndpoint(server)
-
-			// // TODO JW-187. For now, VM name is the same as Endpoint ID, not
-			// // Container ID
-			// dockerNet, err := getDockerNetwork(docker, dockerNetID)
-			// Expect(err).ToNot(HaveOccurred())
-			// vmName = dockerNet.Containers[containerID].EndpointID
-
-			// contrailInst, err = types.VirtualMachineByName(contrailController.ApiClient, vmName)
-			// Expect(err).ToNot(HaveOccurred())
-			// Expect(contrailInst).ToNot(BeNil())
-
-			// vifFQName := fmt.Sprintf("%s:%s:%s", common.DomainName, tenantName, vmName)
-			// contrailVif, err = types.VirtualMachineInterfaceByName(contrailController.ApiClient,
-			// 	vifFQName)
-			// Expect(err).ToNot(HaveOccurred())
-			// Expect(contrailVif).ToNot(BeNil())
-
-			// contrailIP, err = types.InstanceIpByName(contrailController.ApiClient, vmName)
-			// Expect(err).ToNot(HaveOccurred())
-			// Expect(contrailIP).ToNot(BeNil())
-		})
-		AfterEach(func(done Done) {
-			// Done channel is ginkgo feature for setting timeouts
-			// https://onsi.github.io/ginkgo/#asynchronous-tests
-			log.Debugln("Waiting for request")
-			<-mockAgentListener.Received
-			log.Debugln("Done waiting for request")
-
-			mockAgentListener.Close()
-			mockAgentListener = nil
-			close(done)
-		})
-
-		assertRemovesDockerEndpoint := func() {
-			_, err := docker.ContainerInspect(context.Background(), containerID)
-			Expect(err).To(HaveOccurred())
-		}
-
-		assertRemovesHNSEndpoint := func() {
-			ep, err := hns.GetHNSEndpoint(hnsEndpointID)
-			Expect(err).To(HaveOccurred())
-			Expect(ep).To(BeNil())
-		}
-
-		assertRemovesContrailVM := func() {
-			// TODO: This test must be rewritten using Controller interface.
-			// In other words, it mustn't access ApiClient field.
-
-			// _, err := types.VirtualMachineByName(contrailController.ApiClient,
-			// 	vmName)
-			// Expect(err).To(HaveOccurred())
-
-			// _, err = types.VirtualMachineInterfaceByName(contrailController.ApiClient,
-			// 	fmt.Sprintf("%s:%s:%s", common.DomainName, tenantName, vmName))
-			// Expect(err).To(HaveOccPurred())
-
-			// _, err = types.InstanceIpByName(contrailController.ApiClient,
-			// 	contrailVif.GetName())
-			// Expect(err).To(HaveOccurred())
-		}
-
-		Context("happy case: HNS, docker and Contrail states are in sync", func() {
-			BeforeEach(func() {
-				stopAndRemoveDockerContainer(docker, containerID)
-			})
-			It("removes docker endpoint", assertRemovesDockerEndpoint)
-			It("removes HNS endpoint", assertRemovesHNSEndpoint)
-			PIt("removes virtual-machine and its children in Contrail", assertRemovesContrailVM)
-		})
-
-		Context("HNS endpoint doesn't exist", func() {
-			BeforeEach(func() {
-				err := hns.DeleteHNSEndpoint(hnsEndpointID)
-				Expect(err).ToNot(HaveOccurred())
-				stopAndRemoveDockerContainer(docker, containerID)
-			})
-			It("removes docker endpoint", assertRemovesDockerEndpoint)
-			It("removes virtual-machine and its children in Contrail", assertRemovesContrailVM)
-		})
-
-		Context("virtual-machine in Contrail doesn't exist", func() {
-			BeforeEach(func() {
-				err := contrailController.DeleteElementRecursive(contrailInst)
-				Expect(err).ToNot(HaveOccurred())
-				stopAndRemoveDockerContainer(docker, containerID)
-			})
-			It("removes docker endpoint", assertRemovesDockerEndpoint)
-			It("removes HNS endpoint", assertRemovesHNSEndpoint)
-		})
-	})
-
-	Context("on EndpointInfo request", func() {
-
-		dockerNetID := ""
-		containerID := ""
-		var req *network.InfoRequest
-
-		BeforeEach(func() {
-			_, dockerNetID, containerID = setupNetworksAndEndpoints(contrailController, docker)
-			dockerNet, err := getDockerNetwork(docker, dockerNetID)
-			Expect(err).ToNot(HaveOccurred())
-			req = &network.InfoRequest{
-				NetworkID:  dockerNetID,
-				EndpointID: dockerNet.Containers[containerID].EndpointID,
-			}
-		})
-
-		Context("queried endpoint exists", func() {
-			It("responds with proper InfoResponse", func() {
-				resp, err := server.EndpointInfo(req)
-				Expect(err).ToNot(HaveOccurred())
-
-				hnsEndpoint, _ := getTheOnlyHNSEndpoint(server)
-				Expect(resp.Value).To(HaveKeyWithValue("hnsid", hnsEndpoint.Id))
-				Expect(resp.Value).To(HaveKeyWithValue(
-					"com.docker.network.endpoint.macaddress", hnsEndpoint.MacAddress))
-			})
-		})
-
-		Context("queried endpoint doesn't exist", func() {
-			BeforeEach(func() {
-				deleteTheOnlyHNSEndpoint(server)
-			})
-			It("responds with err", func() {
-				_, err := server.EndpointInfo(req)
-				Expect(err).To(HaveOccurred())
-			})
-		})
-	})
-
-	Context("on Join request", func() {
-
-		dockerNetID := ""
-		containerID := ""
-		var req *network.JoinRequest
-
-		BeforeEach(func() {
-			_, dockerNetID, containerID = setupNetworksAndEndpoints(contrailController, docker)
-			dockerNet, err := getDockerNetwork(docker, dockerNetID)
-			Expect(err).ToNot(HaveOccurred())
-			req = &network.JoinRequest{
-				NetworkID:  dockerNetID,
-				EndpointID: dockerNet.Containers[containerID].EndpointID,
-			}
-		})
-
-		Context("queried endpoint exists", func() {
-			It("responds with valid gateway IP and disabled gw service", func() {
-				resp, err := server.Join(req)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(resp.DisableGatewayService).To(BeTrue())
-
-				contrailNet, err := contrailController.GetNetwork(tenantName, networkName)
-				Expect(err).ToNot(HaveOccurred())
-				ipams, err := contrailNet.GetNetworkIpamRefs()
-				Expect(err).ToNot(HaveOccurred())
-				subnets := ipams[0].Attr.(types.VnSubnetsType).IpamSubnets
-				contrailGW := subnets[0].DefaultGateway
-
-				Expect(resp.Gateway).To(Equal(contrailGW))
-			})
-		})
-
-		Context("queried endpoint doesn't exist", func() {
-			BeforeEach(func() {
-				deleteTheOnlyHNSEndpoint(server)
-			})
-			It("responds with err", func() {
-				_, err := server.Join(req)
-				Expect(err).To(HaveOccurred())
-			})
-		})
-	})
-
-	Context("on Leave request", func() {
-
-		dockerNetID := ""
-		containerID := ""
-		var req *network.LeaveRequest
-
-		BeforeEach(func() {
-			_, dockerNetID, containerID = setupNetworksAndEndpoints(contrailController, docker)
-			dockerNet, err := getDockerNetwork(docker, dockerNetID)
-			Expect(err).ToNot(HaveOccurred())
-			req = &network.LeaveRequest{
-				NetworkID:  dockerNetID,
-				EndpointID: dockerNet.Containers[containerID].EndpointID,
-			}
-		})
-
-		Context("queried endpoint exists", func() {
+		Context("on DiscoverDelete request", func() {
 			It("responds with nil", func() {
-				err := server.Leave(req)
+				req := network.DiscoveryNotification{}
+				err := server.DiscoverDelete(&req)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
 
-		Context("queried endpoint doesn't exist", func() {
-			BeforeEach(func() {
-				deleteTheOnlyHNSEndpoint(server)
-			})
-			It("responds with err", func() {
-				err := server.Leave(req)
-				Expect(err).To(HaveOccurred())
+		Context("on ProgramExternalConnectivity request", func() {
+			It("responds with nil", func() {
+				req := network.ProgramExternalConnectivityRequest{}
+				err := server.ProgramExternalConnectivity(&req)
+				Expect(err).ToNot(HaveOccurred())
 			})
 		})
-	})
 
-	Context("on DiscoverNew request", func() {
-		It("responds with nil", func() {
-			req := network.DiscoveryNotification{}
-			err := server.DiscoverNew(&req)
-			Expect(err).ToNot(HaveOccurred())
-		})
-	})
-
-	Context("on DiscoverDelete request", func() {
-		It("responds with nil", func() {
-			req := network.DiscoveryNotification{}
-			err := server.DiscoverDelete(&req)
-			Expect(err).ToNot(HaveOccurred())
-		})
-	})
-
-	Context("on ProgramExternalConnectivity request", func() {
-		It("responds with nil", func() {
-			req := network.ProgramExternalConnectivityRequest{}
-			err := server.ProgramExternalConnectivity(&req)
-			Expect(err).ToNot(HaveOccurred())
-		})
-	})
-
-	Context("on RevokeExternalConnectivity request", func() {
-		It("responds with nil", func() {
-			req := network.RevokeExternalConnectivityRequest{}
-			err := server.RevokeExternalConnectivity(&req)
-			Expect(err).ToNot(HaveOccurred())
+		Context("on RevokeExternalConnectivity request", func() {
+			It("responds with nil", func() {
+				req := network.RevokeExternalConnectivityRequest{}
+				err := server.RevokeExternalConnectivity(&req)
+				Expect(err).ToNot(HaveOccurred())
+			})
 		})
 	})
 })
