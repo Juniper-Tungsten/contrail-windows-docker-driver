@@ -160,7 +160,7 @@ func (ws *WinService) Execute(args []string, winChangeReqChan <-chan svc.ChangeR
 		return
 	}
 
-	d := docker_libnetwork_plugin.NewDockerPluginServer(core)
+	d := docker_libnetwork_plugin.NewServerCNM(core)
 	if err = d.StartServing(); err != nil {
 		log.Error(err)
 		return
