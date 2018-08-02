@@ -20,7 +20,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/auth"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_REST/auth"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"

@@ -23,8 +23,8 @@ import (
 	"time"
 
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/primary/cnm"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/auth"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_REST"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_REST/auth"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hyperv_extension"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/agent"

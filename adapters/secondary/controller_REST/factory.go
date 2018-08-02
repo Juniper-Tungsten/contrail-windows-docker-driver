@@ -16,8 +16,8 @@
 package controller_rest
 
 import (
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/api"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/auth"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_REST/api"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_REST/auth"
 )
 
 func NewControllerWithKeystoneAdapter(keys *auth.KeystoneParams, ip string, port int) (*ControllerAdapter, error) {
