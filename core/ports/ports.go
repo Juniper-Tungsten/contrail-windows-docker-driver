@@ -22,7 +22,7 @@ import (
 	"github.com/Juniper/contrail-windows-docker-driver/core/model"
 )
 
-type Agent interface {
+type PortAssociation interface {
 	AddPort(vmUUID, vifUUID, ifName, mac, dockerID, ipAddress, vnUUID string) error
 	DeletePort(vifUUID string) error
 }

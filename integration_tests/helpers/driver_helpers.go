@@ -25,7 +25,7 @@ import (
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hyperv_extension"
 	netSim "github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/simulator"
-	"github.com/Juniper/contrail-windows-docker-driver/agent"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/port_association/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/core/driver_core"
 	"github.com/Juniper/contrail-windows-docker-driver/core/ports"
