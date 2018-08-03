@@ -7,36 +7,68 @@
 1. Download `dep` package manager for golang: https://github.com/golang/dep
 
 2. Fetch dependencies into vendor/ directory:
-```
-dep ensure -v
-dep prune -v
-```
+    ```
+    dep ensure -v
+    dep prune -v
+    ```
 
 ### Generate Contrail Go API
 
 1. Checkout github.com/Juniper/contrail-api-client to some temporary directory
 
-```
-git clone https://github.com/Juniper/contrail-api-client C:\some_dir\
-```
+    ```
+    git clone https://github.com/Juniper/contrail-api-client C:\some_dir\
+    ```
 
 2. Generate Golang API
 
-```
-C:\some_dir\contrail-api-client\generateds\generateDS.py -q -f -o C:\some_dir\types\ -g golang-api C:\some_dir\contrail-api-client\schema\vnc_cfg.xsd
-```
+    Requirements: python version <= 2.7.13, lxml package
+
+    ```
+    virtualenv -p \path\to\python<=2.7.13\executable path\to\env
+    \path\to\env\Scripts\activate
+    pip install lxml
+    C:\some_dir\contrail-api-client\generateds\generateDS.py -q -f -o C:\some_dir\types\ -g golang-api C:\some_dir\contrail-api-client\schema\vnc_cfg.xsd
+    ```
 
 3. Copy generated files to specific third party vendor package
 
-```
-cp C:\some_dir\types\* .\vendor\github.com\Juniper\contrail-go-api\types\
-```
+    ```
+    cp C:\some_dir\types\* .\vendor\github.com\Juniper\contrail-go-api\types\
+    ```
 
 ## Building
 
-```
-.\Invoke-Build.ps1 [-SkipExe] [-SkipTests] [-SkipMSI]
-```
+1. Install go packages
+
+    ```
+    go get github.com/onsi/ginkgo/ginkgo
+    go get github.com/onsi/gomega/...
+    ```
+
+2. Install WiX toolset
+
+    See: https://github.com/wixtoolset/wix3/releases/tag/wix3111rtm
+
+    Make sure to add WiX to your PATH variable (for example: `C:\Program Files (x86)\WiX Toolset v3.11\bin`)
+    Note that WiX's MSBuild requires .NET 3.5 to be installed. See section 'WiX system requirements':
+    http://wixtoolset.org/documentation/manual/v3/main/
+
+3. Install chocolatey
+
+    See: https://chocolatey.org/install
+
+4. Install go-msi
+
+    ```
+    choco install go-msi
+    ```
+
+5. Invoke build
+
+    ```
+    .\Invoke-Build.ps1 [-SkipExe] [-SkipTests] [-SkipMSI]
+    ```
 
 Build artifacts will appear under build/ directory.
 
