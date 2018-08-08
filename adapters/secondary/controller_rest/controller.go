@@ -117,6 +117,22 @@ func (c *ControllerAdapterImpl) GetNetwork(tenantName, networkName string) (*typ
 	return net, nil
 }
 
+func (c *ControllerAdapterImpl) GetNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (
+	*types.VirtualNetwork, *types.IpamSubnetType, error) {
+	network, err := c.GetNetwork(tenantName, networkName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	log.Debugln("Got Contrail network", network.GetName())
+
+	ipamSubnet, err := c.GetIpamSubnet(network, subnetCIDR)
+	if err != nil {
+		return nil, nil, err
+	}
+	return network, ipamSubnet, nil
+}
+
 // GetIpamSubnet returns IPAM subnet of specified virtual network with specified CIDR.
 // If virtual network has only one subnet, CIDR is ignored.
 func (c *ControllerAdapterImpl) GetIpamSubnet(net *types.VirtualNetwork, CIDR string) (
@@ -182,6 +198,10 @@ func (c *ControllerAdapterImpl) GetDefaultGatewayIp(subnet *types.IpamSubnetType
 		return "", err
 	}
 	return gw, nil
+}
+
+func (c *ControllerAdapterImpl) getCidrFromIpamSubnet(ipam *types.IpamSubnetType) string {
+	return fmt.Sprintf("%s/%v", ipam.Subnet.IpPrefix, ipam.Subnet.IpPrefixLen)
 }
 
 func (c *ControllerAdapterImpl) GetOrCreateInstance(vif *types.VirtualMachineInterface, containerId string) (

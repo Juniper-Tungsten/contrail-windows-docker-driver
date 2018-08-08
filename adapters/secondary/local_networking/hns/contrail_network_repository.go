@@ -47,10 +47,9 @@ func NewHNSContrailNetworksRepository(physDataplaneNetAdapter common.AdapterName
 	}, nil
 }
 
-func (repo *HNSContrailNetworksRepository) CreateNetwork(dockerNetID, tenantName, networkName,
-	subnetCIDR, defaultGW string) error {
+func (repo *HNSContrailNetworksRepository) CreateNetwork(dockerNetID string, network *model.Network) error {
 
-	hnsNetName := repo.associations.GenerateName(dockerNetID, tenantName, networkName, subnetCIDR)
+	hnsNetName := repo.associations.GenerateName(dockerNetID, network.TenantName, network.NetworkName, network.Subnet.CIDR)
 
 	net, err := GetHNSNetworkByName(hnsNetName)
 	if net != nil {
@@ -59,8 +58,8 @@ func (repo *HNSContrailNetworksRepository) CreateNetwork(dockerNetID, tenantName
 
 	subnets := []hcsshim.Subnet{
 		{
-			AddressPrefix:  subnetCIDR,
-			GatewayAddress: defaultGW,
+			AddressPrefix:  network.Subnet.CIDR,
+			GatewayAddress: network.Subnet.DefaultGW,
 		},
 	}
 
@@ -87,13 +86,17 @@ func (repo *HNSContrailNetworksRepository) GetNetwork(dockerNetID string) (*mode
 	}
 	_, foundTenantName, foundNetworkName, foundSubnetCIDR :=
 		repo.associations.SplitName(hnsNetwork.Name)
-	net := model.Network{
+
+	Subnet := model.Subnet{
+		CIDR: foundSubnetCIDR,
+	}
+	Net := model.Network{
+		LocalID:     hnsNetwork.Id,
 		TenantName:  foundTenantName,
 		NetworkName: foundNetworkName,
-		SubnetCIDR:  foundSubnetCIDR,
-		LocalID:     hnsNetwork.Id,
+		Subnet:      Subnet,
 	}
-	return &net, nil
+	return &Net, nil
 }
 
 func (repo *HNSContrailNetworksRepository) DeleteNetwork(dockerNetID string) error {
@@ -123,11 +126,14 @@ func (repo *HNSContrailNetworksRepository) ListNetworks() ([]model.Network, erro
 	for _, hnsNetwork := range hnsNetworks {
 		_, foundTenantName, foundNetworkName, foundSubnetCIDR :=
 			repo.associations.SplitName(hnsNetwork.Name)
+		Subnet := model.Subnet{
+			CIDR: foundSubnetCIDR,
+		}
 		net := model.Network{
+			LocalID:     hnsNetwork.Id,
 			TenantName:  foundTenantName,
 			NetworkName: foundNetworkName,
-			SubnetCIDR:  foundSubnetCIDR,
-			LocalID:     hnsNetwork.Id,
+			Subnet:      Subnet,
 		}
 		ownedNets = append(ownedNets, net)
 	}

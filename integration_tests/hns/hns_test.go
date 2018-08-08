@@ -86,6 +86,16 @@ const (
 
 var _ = PDescribe("HNSContrailNetworksRepository", func() {
 
+	subnet := model.Subnet{
+		CIDR:      subnetCIDR,
+		DefaultGW: defaultGW,
+	}
+	net := model.Network{
+		TenantName:  tenantName,
+		NetworkName: networkName,
+		Subnet:      subnet,
+	}
+
 	var hnsContrailRepo *hns.HNSContrailNetworksRepository
 
 	BeforeEach(func() {
@@ -101,7 +111,7 @@ var _ = PDescribe("HNSContrailNetworksRepository", func() {
 
 	Context("specified network does not exist", func() {
 		Specify("creating a new HNS network works", func() {
-			err := hnsContrailRepo.CreateNetwork(dockerNetID, tenantName, networkName, subnetCIDR, defaultGW)
+			err := hnsContrailRepo.CreateNetwork(dockerNetID, &net)
 			Expect(err).ToNot(HaveOccurred())
 		})
 		Specify("getting the HNS network returns error", func() {
@@ -114,16 +124,14 @@ var _ = PDescribe("HNSContrailNetworksRepository", func() {
 	Context("specified network already exists", func() {
 		var existingNet *model.Network
 		BeforeEach(func() {
-			err := hnsContrailRepo.CreateNetwork(dockerNetID, tenantName,
-				networkName, subnetCIDR, defaultGW)
+			err := hnsContrailRepo.CreateNetwork(dockerNetID, &net)
 			Expect(err).ToNot(HaveOccurred())
 			existingNet, err = hnsContrailRepo.GetNetwork(dockerNetID)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		Specify("creating a new network with same params returns error", func() {
-			err := hnsContrailRepo.CreateNetwork(dockerNetID, tenantName,
-				networkName, subnetCIDR, defaultGW)
+			err := hnsContrailRepo.CreateNetwork(dockerNetID, &net)
 			Expect(err).To(HaveOccurred())
 		})
 

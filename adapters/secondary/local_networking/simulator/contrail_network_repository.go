@@ -16,6 +16,7 @@
 package simulator
 
 import (
+
 	// We should rely on some kind of domain objects in the future - not hcsshim structs
 	// everywhere.
 	"errors"
@@ -37,11 +38,11 @@ func NewInMemContrailNetworksRepository() *InMemContrailNetworksRepository {
 	}
 }
 
-func (repo *InMemContrailNetworksRepository) CreateNetwork(dockerNetID, tenantName, networkName, subnetCIDR, defaultGW string) error {
-	name := repo.associations.GenerateName(dockerNetID, tenantName, networkName, subnetCIDR)
+func (repo *InMemContrailNetworksRepository) CreateNetwork(dockerNetID string, net *model.Network) error {
+	name := repo.associations.GenerateName(dockerNetID, net.TenantName, net.NetworkName, net.Subnet.CIDR)
 
-	net := hcsshim.HNSNetwork{Name: name}
-	repo.networks[dockerNetID] = net
+	network := hcsshim.HNSNetwork{Name: name}
+	repo.networks[dockerNetID] = network
 
 	return nil
 }
@@ -51,10 +52,12 @@ func (repo *InMemContrailNetworksRepository) GetNetwork(dockerNetID string) (*mo
 		_, foundTenantName, foundNetworkName, foundSubnetCIDR :=
 			repo.associations.SplitName(net.Name)
 		return &model.Network{
+			LocalID:     "123hnsNetID",
 			TenantName:  foundTenantName,
 			NetworkName: foundNetworkName,
-			SubnetCIDR:  foundSubnetCIDR,
-			LocalID:     "123hnsNetID",
+			Subnet: model.Subnet{
+				CIDR: foundSubnetCIDR,
+			},
 		}, nil
 	} else {
 		return nil, errors.New("network not found")
@@ -76,10 +79,12 @@ func (repo *InMemContrailNetworksRepository) ListNetworks() ([]model.Network, er
 		_, foundTenantName, foundNetworkName, foundSubnetCIDR :=
 			repo.associations.SplitName(net.Name)
 		mnet := model.Network{
+			LocalID:     "123hnsNetID",
 			TenantName:  foundTenantName,
 			NetworkName: foundNetworkName,
-			SubnetCIDR:  foundSubnetCIDR,
-			LocalID:     "123hnsNetID",
+			Subnet: model.Subnet{
+				CIDR: foundSubnetCIDR,
+			},
 		}
 		arr = append(arr, mnet)
 	}
