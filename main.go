@@ -48,7 +48,7 @@ func main() {
 	var logPath = flag.String("logPath", logging.DefaultLogFilepath(), "log filepath")
 	var logLevelString = flag.String("logLevel", "Info",
 		"log verbosity (possible values: Debug|Info|Warn|Error|Fatal|Panic)")
-	var vswitchNameWildcard = flag.String("vswitchName", "Layered <adapter>",
+	var vswitchNameWildcard = flag.String("vswitchName", "Layered?<adapter>",
 		"Name of Transparent virtual switch. Special wildcard \"<adapter>\" will be interpretted "+
 			"as value of netAdapter parameter. For example, if netAdapter is \"Ethernet0\", then "+
 			"vswitchName will equal \"Layered Ethernet0\". You can use Get-VMSwitch PowerShell "+
