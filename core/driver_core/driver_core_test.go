@@ -23,6 +23,8 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/Juniper/contrail-windows-docker-driver/core/model"
+
 	"github.com/Juniper/contrail-go-api/types"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hyperv_extension"
@@ -85,7 +87,14 @@ var _ = Describe("Core tests", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(netsBefore).To(HaveLen(len(netsAfter) - 1))
 		})
-
+		It("gets CIDR information from Contrail if it's unspecified in given network", func() {
+			unspecifiedCIDR := "0.0.0.0/0"
+			err := testedCore.CreateNetwork(dockerNetID, tenantName, networkName, unspecifiedCIDR)
+			Expect(err).ToNot(HaveOccurred())
+			net, err := localNetRepo.GetNetwork(dockerNetID)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(net.Subnet.CIDR).To(Equal(subnetCIDR))
+		})
 		type TestCase struct {
 			tenant  string
 			network string
@@ -118,7 +127,16 @@ var _ = Describe("Core tests", func() {
 	}
 	setupLocalNetworkWithoutControllerNetwork := func() {
 		someGateway := "1.2.3.1"
-		err := localNetRepo.CreateNetwork(dockerNetID, tenantName, networkName, subnetCIDR, someGateway)
+		subnet := model.Subnet{
+			CIDR:      subnetCIDR,
+			DefaultGW: someGateway,
+		}
+		net := model.Network{
+			TenantName:  tenantName,
+			NetworkName: networkName,
+			Subnet:      subnet,
+		}
+		err := localNetRepo.CreateNetwork(dockerNetID, &net)
 		Expect(err).ToNot(HaveOccurred())
 	}
 
@@ -141,11 +159,10 @@ var _ = Describe("Core tests", func() {
 		}
 		assertDoesNotRemoveControllerNetwork := func() {
 			_ = testedCore.DeleteNetwork(dockerNetID)
-			net, subnet, err := controller.GetNetworkWithSubnet(tenantName, networkName, subnetCIDR)
+			net, err := controller.GetNetworkWithSubnet(tenantName, networkName, subnetCIDR)
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(net).ToNot(BeNil())
-			Expect(subnet).ToNot(BeNil())
 		}
 		Context("Controller network and local network exist", func() {
 			BeforeEach(setupControllerNetworkAndLocalNetwork)

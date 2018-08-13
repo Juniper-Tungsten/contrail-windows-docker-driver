@@ -63,7 +63,7 @@ func (core *ContrailDriverCore) initializeAdapters() error {
 }
 
 func (core *ContrailDriverCore) CreateNetwork(dockerNetID, tenantName, networkName, subnetCIDR string) error {
-	network, ipamSubnet, err := core.Controller.GetNetworkWithSubnet(tenantName, networkName, subnetCIDR)
+	network, err := core.Controller.GetNetworkWithSubnet(tenantName, networkName, subnetCIDR)
 	if err != nil {
 		return err
 	}
@@ -71,9 +71,9 @@ func (core *ContrailDriverCore) CreateNetwork(dockerNetID, tenantName, networkNa
 		return errors.New("Retrieved Contrail network is nil")
 	}
 
-	log.Debugln("Got Contrail network", network.GetDisplayName())
+	log.Debugln("Got Contrail network", network.NetworkName)
 
-	gateway := ipamSubnet.DefaultGateway
+	gateway := network.Subnet.DefaultGW
 	if gateway == "" {
 		// TODO: this fails in unit tests using contrail-go-api mock. So either:
 		// * fix contrail-go-api mock to return *some* default GW
@@ -82,8 +82,7 @@ func (core *ContrailDriverCore) CreateNetwork(dockerNetID, tenantName, networkNa
 		log.Warn("Default GW is empty")
 	}
 
-	return core.LocalContrailNetworksRepo.CreateNetwork(dockerNetID, tenantName, networkName, subnetCIDR,
-		gateway)
+	return core.LocalContrailNetworksRepo.CreateNetwork(dockerNetID, network)
 }
 
 func (core *ContrailDriverCore) DeleteNetwork(dockerNetID string) error {

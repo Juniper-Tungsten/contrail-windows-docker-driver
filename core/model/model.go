@@ -35,11 +35,16 @@ type Container struct {
 type Network struct {
 	TenantName  string
 	NetworkName string
-	SubnetCIDR  string
 	LocalID     string
+	Subnet      Subnet
 }
 
 type LocalEndpoint struct {
 	IfName string
 	Name   string
+}
+
+type Subnet struct {
+	DefaultGW string
+	CIDR      string
 }

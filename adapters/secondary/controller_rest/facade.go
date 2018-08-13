@@ -49,20 +49,24 @@ func (c *ControllerAdapter) GetNetwork(tenantName, networkName string) (*types.V
 	return c.controller.GetNetwork(tenantName, networkName)
 }
 
-func (c *ControllerAdapter) GetNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, *types.IpamSubnetType, error) {
-	network, err := c.controller.GetNetwork(tenantName, networkName)
+func (c *ControllerAdapter) GetNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*model.Network, error) {
+	network, ipamSubnet, err := c.controller.GetNetworkWithSubnet(tenantName, networkName, subnetCIDR)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	log.Infoln("Got Contrail network", network.GetDisplayName())
-
-	ipamSubnet, err := c.controller.GetIpamSubnet(network, subnetCIDR)
-	if err != nil {
-		return nil, nil, err
+	subnet := model.Subnet{
+		CIDR:      c.controller.getCidrFromIpamSubnet(ipamSubnet),
+		DefaultGW: ipamSubnet.DefaultGateway,
 	}
 
-	return network, ipamSubnet, nil
+	net := &model.Network{
+		NetworkName: network.GetName(),
+		TenantName:  tenantName,
+		Subnet:      subnet,
+	}
+
+	return net, nil
 }
 
 func (c *ControllerAdapter) GetDefaultGatewayIp(ipamSubnet *types.IpamSubnetType) (string, error) {
@@ -70,8 +74,7 @@ func (c *ControllerAdapter) GetDefaultGatewayIp(ipamSubnet *types.IpamSubnetType
 }
 
 func (c *ControllerAdapter) CreateContainerInSubnet(network *model.Network, containerID string) (*model.Container, error) {
-
-	retreivedNetwork, ipamSubnet, err := c.GetNetworkWithSubnet(network.TenantName, network.NetworkName, network.SubnetCIDR)
+	retreivedNetwork, ipamSubnet, err := c.controller.GetNetworkWithSubnet(network.TenantName, network.NetworkName, network.Subnet.CIDR)
 	if err != nil {
 		return nil, err
 	}

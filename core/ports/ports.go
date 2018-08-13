@@ -32,7 +32,7 @@ type VRouter interface {
 }
 
 type LocalContrailNetworkRepository interface {
-	CreateNetwork(dockerNetID, tenantName, networkName, subnetCIDR, defaultGW string) error
+	CreateNetwork(dockerNetID string, network *model.Network) error
 	GetNetwork(dockerNetID string) (*model.Network, error)
 	DeleteNetwork(dockerNetID string) error
 	ListNetworks() ([]model.Network, error)
@@ -46,7 +46,7 @@ type LocalContrailEndpointRepository interface {
 
 type Controller interface {
 	CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, error)
-	GetNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, *types.IpamSubnetType, error)
+	GetNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*model.Network, error)
 
 	CreateContainerInSubnet(net *model.Network, containerID string) (*model.Container, error)
 	DeleteContainer(containerID string) error
