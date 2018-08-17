@@ -118,6 +118,7 @@ func (core *ContrailDriverCore) CreateEndpoint(dockerNetID, endpointID string) (
 		if err != nil {
 			log.Error(err.Error())
 		}
+		log.Debugln("CreateEndpoint: core.associatePort done for ", container)
 	}()
 	return container, nil
 }
