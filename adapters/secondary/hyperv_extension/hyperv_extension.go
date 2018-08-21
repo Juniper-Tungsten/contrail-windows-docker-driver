@@ -16,9 +16,10 @@
 package hyperv_extension
 
 import (
+	"errors"
 	"fmt"
 
-	"github.com/Juniper/contrail-windows-docker-driver/common"
+	"github.com/Juniper/contrail-windows-docker-driver/powershell"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -38,7 +39,7 @@ func NewHyperVvRouterForwardingExtension(vswitchName string) *hyperVvRouterForwa
 
 func (hvvr *hyperVvRouterForwardingExtension) Enable() error {
 	log.Infoln("Enabling Hyper-V Extension")
-	if out, err := hvvr.callOnSwitch("Enable-VMSwitchExtension"); err != nil {
+	if out, err := hvvr.callOnSwitchExtension("Enable-VMSwitchExtension"); err != nil {
 		log.Errorf("When enabling Hyper-V Extension: %s, %s", err, out)
 		return err
 	}
@@ -47,7 +48,7 @@ func (hvvr *hyperVvRouterForwardingExtension) Enable() error {
 
 func (hvvr *hyperVvRouterForwardingExtension) Disable() error {
 	log.Infoln("Disabling Hyper-V Extension")
-	if out, err := hvvr.callOnSwitch("Disable-VMSwitchExtension"); err != nil {
+	if out, err := hvvr.callOnSwitchExtension("Disable-VMSwitchExtension"); err != nil {
 		log.Errorf("When disabling Hyper-V Extension: %s, %s", err, out)
 		return err
 	}
@@ -73,22 +74,41 @@ func (hvvr *hyperVvRouterForwardingExtension) IsRunning() (bool, error) {
 }
 
 func (hvvr *hyperVvRouterForwardingExtension) inspectExtensionProperty(property string) (string, error) {
-	log.Infoln("Inspecting Hyper-V Extension for property:", property)
+	log.Debugln("Inspecting Hyper-V Extension for property:", property)
 	// we use -Expand, because otherwise, we get an object instead of single string value
-	out, err := hvvr.callOnSwitch("Get-VMSwitchExtension", "|", "Select",
+	out, err := hvvr.callOnSwitchExtension("Get-VMSwitchExtension", "|", "Select",
 		"-Expand", fmt.Sprintf("\"%s\"", property))
 	log.Debugln("Inspect result:", out)
 	return out, err
 }
 
-func (hvvr *hyperVvRouterForwardingExtension) callOnSwitch(command string, optionals ...string) (string,
+func (hvvr *hyperVvRouterForwardingExtension) callOnSwitchExtension(command string, optionals ...string) (string,
 	error) {
+
+	if switchExists, err := hvvr.doesSwitchExist(); err != nil {
+		return "", err
+	} else if !switchExists {
+		return "", errors.New("could not perform action on vmswitch extension, because vmswitch was not found")
+	}
+
 	c := []string{command,
 		"-VMSwitchName", fmt.Sprintf("\"%s\"", hvvr.vswitchName),
 		"-Name", fmt.Sprintf("\"%s\"", hvvr.extensionName)}
 	for _, opt := range optionals {
 		c = append(c, opt)
 	}
-	stdout, _, err := common.CallPowershell(c...)
+	stdout, _, err := powershell.CallPowershell(c...)
 	return stdout, err
+}
+
+func (hvvr *hyperVvRouterForwardingExtension) doesSwitchExist() (bool, error) {
+	c := []string{"Get-VMSwitch", "-Name", fmt.Sprintf("\"%s\"", hvvr.vswitchName)}
+	stdout, _, err := powershell.CallPowershell(c...)
+	if err != nil {
+		return false, err
+	} else if stdout == "" {
+		return false, nil
+	} else {
+		return true, nil
+	}
 }

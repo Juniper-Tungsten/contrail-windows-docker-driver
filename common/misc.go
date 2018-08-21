@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Juniper/contrail-windows-docker-driver/powershell"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -29,16 +30,16 @@ type AdapterName string
 func HardResetHNS() error {
 	log.Infoln("Resetting HNS")
 	log.Debugln("Removing NAT")
-	if _, _, err := CallPowershell("Get-NetNat", "|", "Remove-NetNat"); err != nil {
+	if _, _, err := powershell.CallPowershell("Get-NetNat", "|", "Remove-NetNat"); err != nil {
 		log.Debugln("Could not remove nat network:", err)
 	}
 	log.Debugln("Removing container networks")
-	if _, _, err := CallPowershell("Get-ContainerNetwork", "|", "Remove-ContainerNetwork",
+	if _, _, err := powershell.CallPowershell("Get-ContainerNetwork", "|", "Remove-ContainerNetwork",
 		"-Force"); err != nil {
 		log.Debugln("Could not remove container network:", err)
 	}
 	log.Debugln("Stopping HNS")
-	if _, _, err := CallPowershell("Stop-Service", "hns"); err != nil {
+	if _, _, err := powershell.CallPowershell("Stop-Service", "hns"); err != nil {
 		log.Debugln("HNS is already stopped:", err)
 	}
 	log.Debugln("Removing HNS program data")
@@ -48,11 +49,11 @@ func HardResetHNS() error {
 		return errors.New("Invalid program data env variable")
 	}
 	hnsDataDir := filepath.Join(programData, "Microsoft", "Windows", "HNS", "HNS.data")
-	if _, _, err := CallPowershell("Remove-Item", hnsDataDir); err != nil {
+	if _, _, err := powershell.CallPowershell("Remove-Item", hnsDataDir); err != nil {
 		return fmt.Errorf("Error during removing HNS program data: %s", err)
 	}
 	log.Debugln("Starting HNS")
-	if _, _, err := CallPowershell("Start-Service", "hns"); err != nil {
+	if _, _, err := powershell.CallPowershell("Start-Service", "hns"); err != nil {
 		return fmt.Errorf("Error when starting HNS: %s", err)
 	}
 	return nil
@@ -60,7 +61,7 @@ func HardResetHNS() error {
 
 func RestartDocker() error {
 	log.Infoln("Restarting docker")
-	if _, _, err := CallPowershell("Restart-Service", "docker"); err != nil {
+	if _, _, err := powershell.CallPowershell("Restart-Service", "docker"); err != nil {
 		return fmt.Errorf("When restarting docker: %s", err)
 	}
 	return nil
