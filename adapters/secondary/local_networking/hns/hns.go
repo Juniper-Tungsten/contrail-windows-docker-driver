@@ -103,7 +103,7 @@ func tryCreateHNSNetwork(config string) (string, error) {
 }
 
 func CreateHNSNetwork(configuration *hcsshim.HNSNetwork) (string, error) {
-	log.Infoln("Creating HNS network")
+	log.Debugln("Creating HNS network")
 	configBytes, err := json.Marshal(configuration)
 	if err != nil {
 		log.Errorln(err)
@@ -120,8 +120,7 @@ func CreateHNSNetwork(configuration *hcsshim.HNSNetwork) (string, error) {
 			if recoverableErr, ok := err.(*recoverableError); ok {
 				err = recoverableErr.inner
 				if time.Since(creatingStart) < common.CreateHNSNetworkTimeout {
-					log.Infoln("Creating HNS network failed, retrying.")
-					log.Infoln("Sleeping", delay, "ms")
+					log.Warnln("Creating HNS network failed. Sleeping for ", delay, "ms before retrying.")
 					time.Sleep(delay)
 					delay *= 2
 					continue
@@ -183,7 +182,7 @@ func DeleteHNSNetwork(hnsID string) error {
 }
 
 func ListHNSNetworks() ([]hcsshim.HNSNetwork, error) {
-	log.Infoln("Listing HNS networks")
+	log.Debugln("Listing HNS networks")
 	nets, err := hcsshim.HNSListNetworkRequest("GET", "", "")
 	if err != nil {
 		log.Errorln(err)
@@ -193,7 +192,7 @@ func ListHNSNetworks() ([]hcsshim.HNSNetwork, error) {
 }
 
 func GetHNSNetwork(hnsID string) (*hcsshim.HNSNetwork, error) {
-	log.Infoln("Getting HNS network", hnsID)
+	log.Debugln("Getting HNS network", hnsID)
 	net, err := hcsshim.HNSNetworkRequest("GET", hnsID, "")
 	if err != nil {
 		log.Errorln(err)
@@ -203,7 +202,7 @@ func GetHNSNetwork(hnsID string) (*hcsshim.HNSNetwork, error) {
 }
 
 func GetHNSNetworkByName(name string) (*hcsshim.HNSNetwork, error) {
-	log.Infoln("Getting HNS network by name:", name)
+	log.Debugln("Getting HNS network by name:", name)
 	nets, err := hcsshim.HNSListNetworkRequest("GET", "", "")
 	if err != nil {
 		log.Errorln(err)
@@ -218,7 +217,7 @@ func GetHNSNetworkByName(name string) (*hcsshim.HNSNetwork, error) {
 }
 
 func CreateHNSEndpoint(configuration *hcsshim.HNSEndpoint) (string, error) {
-	log.Infoln("Creating HNS endpoint")
+	log.Debugln("Creating HNS endpoint")
 	configBytes, err := json.Marshal(configuration)
 	if err != nil {
 		log.Errorln(err)
@@ -229,12 +228,12 @@ func CreateHNSEndpoint(configuration *hcsshim.HNSEndpoint) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	log.Infoln("Created HNS endpoint with ID:", response.Id)
+	log.Debugln("Created HNS endpoint with ID:", response.Id)
 	return response.Id, nil
 }
 
 func DeleteHNSEndpoint(endpointID string) error {
-	log.Infoln("Deleting HNS endpoint", endpointID)
+	log.Debugln("Deleting HNS endpoint", endpointID)
 	_, err := hcsshim.HNSEndpointRequest("DELETE", endpointID, "")
 	if err != nil {
 		log.Errorln(err)
@@ -244,7 +243,7 @@ func DeleteHNSEndpoint(endpointID string) error {
 }
 
 func GetHNSEndpoint(endpointID string) (*hcsshim.HNSEndpoint, error) {
-	log.Infoln("Getting HNS endpoint", endpointID)
+	log.Debugln("Getting HNS endpoint", endpointID)
 	endpoint, err := hcsshim.HNSEndpointRequest("GET", endpointID, "")
 	if err != nil {
 		log.Errorln(err)
@@ -254,7 +253,7 @@ func GetHNSEndpoint(endpointID string) (*hcsshim.HNSEndpoint, error) {
 }
 
 func GetHNSEndpointByName(name string) (*hcsshim.HNSEndpoint, error) {
-	log.Infoln("Getting HNS endpoint by name:", name)
+	log.Debugln("Getting HNS endpoint by name:", name)
 	eps, err := hcsshim.HNSListEndpointRequest()
 	if err != nil {
 		log.Errorln(err)

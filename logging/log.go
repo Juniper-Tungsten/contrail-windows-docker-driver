@@ -31,7 +31,7 @@ func SetupHook(logPath, logLevelString string) (*LogToFileHook, error) {
 	}
 	log.SetLevel(logLevel)
 
-	log.Infoln("Logging to", filepath.Dir(logPath))
+	log.Debugln("Logging to", filepath.Dir(logPath))
 
 	err = os.MkdirAll(filepath.Dir(logPath), 0755)
 	if err != nil {
