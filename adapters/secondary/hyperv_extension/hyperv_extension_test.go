@@ -19,12 +19,35 @@ package hyperv_extension_test
 import (
 	"testing"
 
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hyperv_extension"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-// Stub to enable code coverage collection (go cov totally ignores modules without tests)
+// NOTE: these tests require Administrator priveleges to run - hyperv_extension module will call
+// {Get,...}-VMSwitch and {Get,...}-VMSwitchExtension commands and similar.
+
 func TestHyperVExtension(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "HyperVExtension")
 }
+
+var _ = Describe("HyperV Extension", func() {
+
+	Context("Handling nonexisting vSwitch", func() {
+		It("no switch with such name", func() {
+			e := hyperv_extension.NewHyperVvRouterForwardingExtension("Nonexisting switch")
+			_, err := e.IsEnabled()
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("vswitch name has wildcard, but it doesn't match anything anyways", func() {
+			// In Powershell, if a name with wildcard doesn't yield a result, no error is thrown.
+			// It's works like a naive filter. Therefore, if name with wildcard doesn't return
+			// a result, we would like to know it as well.
+			e := hyperv_extension.NewHyperVvRouterForwardingExtension("Nonexisting?switch")
+			_, err := e.IsEnabled()
+			Expect(err).To(HaveOccurred())
+		})
+	})
+})
