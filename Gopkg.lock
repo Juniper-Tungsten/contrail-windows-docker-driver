@@ -11,12 +11,14 @@
 [[projects]]
   name = "github.com/Microsoft/go-winio"
   packages = ["."]
-  revision = "78439966b38d69bf38227fbf57ac8a6fee70f69a"
+  revision = "97e4973ce50b2ff5f09635a57e2b88a037aae829"
+  version = "v0.4.11"
 
 [[projects]]
   name = "github.com/Microsoft/hcsshim"
   packages = ["."]
-  revision = "4486bc29c643509eac9de46f1d77ecb96b5b364f"
+  revision = "0acf63599bff447edf6bbfb8bbb38cb5fb33aa1e"
+  version = "v0.6.14"
 
 [[projects]]
   name = "github.com/coreos/go-systemd"
@@ -142,6 +144,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d0da86fa845b1434cf4ebc19721b1cedf2eee41964e5e0bcf002c5483a83bc46"
+  inputs-digest = "d7cace29f48658985a8c98f6b44bef9665fda80ac8d49240e742f4268df4eb09"
   solver-name = "gps-cdcl"
   solver-version = 1
