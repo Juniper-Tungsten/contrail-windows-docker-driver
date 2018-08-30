@@ -16,6 +16,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"net/http"
 	"net/url"
@@ -63,6 +64,8 @@ func main() {
 		"environment variable")
 	var os_token = flag.String("os_token", "", "Keystone token. If empty, will read "+
 		"environment variable")
+	var authMethod = flag.String("authMethod", "keystone", "Controller auth method. Specifying it is mandatory. "+
+		"(possible values: noauth|keystone)")
 	flag.Parse()
 
 	logHook, err := logging.SetupHook(*logPath, *logLevelString)
@@ -86,7 +89,8 @@ func main() {
 	hypervExtension := hyperv_extension.NewHyperVvRouterForwardingExtension(vswitchName)
 	vrouter := vrouter.NewHyperVvRouter(hypervExtension)
 
-	controller, err := controller_rest.NewControllerWithKeystoneAdapter(keys, *controllerIP, *controllerPort)
+	controller, err := NewControllerAdapter(*authMethod, *controllerIP, *controllerPort, keys)
+
 	if err != nil {
 		log.Error(err)
 		return
@@ -129,4 +133,16 @@ func waitForSigInt() {
 	signal.Notify(c, os.Interrupt)
 	<-c
 	log.Infoln("Good bye")
+}
+
+func NewControllerAdapter(authMethod, ip string, port int, keys *auth.KeystoneParams) (
+	*controller_rest.ControllerAdapter, error) {
+	switch authMethod {
+	case "keystone":
+		return controller_rest.NewControllerWithKeystoneAdapter(keys, ip, port)
+	case "noauth":
+		return controller_rest.NewControllerInsecureAdapter(ip, port)
+	default:
+		return nil, errors.New("Unsupported authentication method. Use -authMethod flag.")
+	}
 }

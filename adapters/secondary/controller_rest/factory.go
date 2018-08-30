@@ -31,8 +31,15 @@ func NewControllerWithKeystoneAdapter(keys *auth.KeystoneParams, ip string, port
 		return nil, err
 	}
 
-	apiClient := api.NewApiClient(ip, port, auth)
+	apiClient := api.NewApiClient(ip, port)
+	apiClient.SetAuthenticator(auth)
 
+	impl := NewControllerAdapterImpl(apiClient)
+	return newControllerAdapter(impl), nil
+}
+
+func NewControllerInsecureAdapter(ip string, port int) (*ControllerAdapter, error) {
+	apiClient := api.NewApiClient(ip, port)
 	impl := NewControllerAdapterImpl(apiClient)
 	return newControllerAdapter(impl), nil
 }

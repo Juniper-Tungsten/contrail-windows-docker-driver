@@ -30,8 +30,6 @@ func NewFakeApiClient() *mocks.ApiClient {
 	return mockedApiClient
 }
 
-func NewApiClient(ip string, port int, auth contrail.Authenticator) *contrail.Client {
-	realApiClient := contrail.NewClient(ip, port)
-	realApiClient.SetAuthenticator(auth)
-	return realApiClient
+func NewApiClient(ip string, port int) *contrail.Client {
+	return contrail.NewClient(ip, port)
 }

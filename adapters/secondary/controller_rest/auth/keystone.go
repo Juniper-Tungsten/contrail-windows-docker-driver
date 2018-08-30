@@ -58,7 +58,6 @@ func (k *KeystoneParams) LoadFromEnvironment() {
 			log.Warn("Keystone variable empty: ", keysReflection.Type().Field(i).Name)
 		}
 	}
-	log.Debugln(k)
 }
 
 func getenvIfNil(currentVal, envVar string) string {

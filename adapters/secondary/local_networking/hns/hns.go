@@ -38,10 +38,6 @@ func InitRootHNSNetwork(nameOfAdapterToUse common.AdapterName) error {
 	// HNS automatically creates a new vswitch if the first HNS network is created. We want to
 	// control this behaviour. That's why we create a dummy root HNS network.
 
-	if err := win_networking.WaitForValidIPReacquisition(nameOfAdapterToUse); err != nil {
-		return err
-	}
-
 	rootNetwork, err := GetHNSNetworkByName(common.RootNetworkName)
 	if err != nil {
 		return err
@@ -58,6 +54,12 @@ func InitRootHNSNetwork(nameOfAdapterToUse common.AdapterName) error {
 			Type:               "transparent",
 			NetworkAdapterName: string(nameOfAdapterToUse),
 			Subnets:            subnets,
+		}
+		// Before we CreateHNSNetwork we need to make sure, that interface we want to attach the vmswitch
+		// to has correct IP address. Otherwise, HNS will complain. The interface exists only, if root HNS
+		// network doesn't yet exist. It disappears the moment vmswitch is created.
+		if err := win_networking.WaitForValidIPReacquisition(nameOfAdapterToUse); err != nil {
+			return err
 		}
 		rootNetID, err := CreateHNSNetwork(configuration)
 		if err != nil {
