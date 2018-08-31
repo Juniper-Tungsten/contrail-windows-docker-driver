@@ -2,11 +2,10 @@
 
 
 [[projects]]
-  branch = "windows"
+  branch = "master"
   name = "github.com/Juniper/contrail-go-api"
   packages = [".","config","mocks"]
-  revision = "7afd0369200400a595f9b147169028fda0b27d1a"
-  source = "github.com/codilime/contrail-go-api"
+  revision = "498aac31fb22c28db3d62ed3bfde7902ba2532a7"
 
 [[projects]]
   name = "github.com/Microsoft/go-winio"

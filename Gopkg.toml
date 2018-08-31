@@ -59,7 +59,9 @@ ignored = ["github.com/Juniper/contrail-go-api/types"]
   name = "github.com/pborman/uuid"
   revision = "e790cca94e6cc75c7064b1332e63811d4aae1a53"
 
+# We need to specify branch master, because otherwise `go dep` will pull v1.1.0 release, which is
+# very old.
+# TODO: consider either removing releases for contrail-go-api or creating a new version v1.2.0.
 [[constraint]]
   name = "github.com/Juniper/contrail-go-api"
-  source = "github.com/codilime/contrail-go-api"
-  branch = "windows"
+  branch = "master"
