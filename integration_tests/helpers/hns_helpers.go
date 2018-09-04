@@ -17,12 +17,11 @@ package helpers
 
 import (
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns"
-	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Microsoft/hcsshim"
 	. "github.com/onsi/gomega"
 )
 
-func CreateTestHNSNetwork(netAdapter common.AdapterName, name, subnetCIDR, defaultGW string) string {
+func CreateTestHNSNetwork(netAdapter string, name, subnetCIDR, defaultGW string) string {
 	subnets := []hcsshim.Subnet{
 		{
 			AddressPrefix:  subnetCIDR,
@@ -32,7 +31,7 @@ func CreateTestHNSNetwork(netAdapter common.AdapterName, name, subnetCIDR, defau
 	netConfig := &hcsshim.HNSNetwork{
 		Name:               name,
 		Type:               "transparent",
-		NetworkAdapterName: string(netAdapter),
+		NetworkAdapterName: netAdapter,
 		Subnets:            subnets,
 	}
 	var err error

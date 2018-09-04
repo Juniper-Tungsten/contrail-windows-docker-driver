@@ -26,7 +26,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	. "github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
-	"github.com/Juniper/contrail-windows-docker-driver/common"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
@@ -338,7 +337,7 @@ var _ = Describe("ControllerAdapterImpl", func() {
 				iface, err := client.GetOrCreateInterface(testNetwork, tenantName, containerID)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(iface).ToNot(BeNil())
-				Expect(iface.GetFQName()).To(Equal([]string{common.DomainName, tenantName,
+				Expect(iface.GetFQName()).To(Equal([]string{DomainName, tenantName,
 					containerID}))
 			})
 			It("does not change vif security group", func() {
@@ -407,7 +406,7 @@ var _ = Describe("ControllerAdapterImpl", func() {
 			})
 			It("does not create vif", func() {
 				_, _ = client.GetExistingInterface(testNetwork, tenantName, containerID)
-				fqName := fmt.Sprintf("%s:%s:%s", common.DomainName, tenantName, containerID)
+				fqName := fmt.Sprintf("%s:%s:%s", DomainName, tenantName, containerID)
 				_, err := types.VirtualMachineInterfaceByName(client.ApiClient, fqName)
 				Expect(err).To(HaveOccurred())
 			})

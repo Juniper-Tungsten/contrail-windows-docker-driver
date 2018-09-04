@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package common
+package helpers
 
 import (
 	"errors"
@@ -24,8 +24,6 @@ import (
 	"github.com/Juniper/contrail-windows-docker-driver/powershell"
 	log "github.com/sirupsen/logrus"
 )
-
-type AdapterName string
 
 func HardResetHNS() error {
 	log.Infoln("Resetting HNS")

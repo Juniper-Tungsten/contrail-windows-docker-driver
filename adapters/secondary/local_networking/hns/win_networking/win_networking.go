@@ -18,16 +18,26 @@ package win_networking
 import (
 	"errors"
 	"net"
+	"time"
 
-	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns/win_networking/retry"
+)
+
+const (
+	// adapterReconnectMaxRetries is number of polling retries to wait for adapter
+	// to reacquire IP after a new HNS network is created. https://github.com/Microsoft/hcsshim/issues/108
+	adapterReconnectMaxRetries = 30
+
+	// adapterPollingRate is rate of polling of network adapter while waiting for it to
+	// reacquire IP.
+	adapterPollingRate = 300 * time.Millisecond
 )
 
 type Interface interface {
 	Addrs() ([]net.Addr, error)
 }
 
-func WaitForValidIPReacquisition(ifname common.AdapterName) error {
+func WaitForValidIPReacquisition(ifname string) error {
 	iface, err := pollForInterfaceToAppearInOS(ifname)
 	if err != nil {
 		return err
@@ -35,14 +45,14 @@ func WaitForValidIPReacquisition(ifname common.AdapterName) error {
 	return waitForValidIPv4Address(iface)
 }
 
-func pollForInterfaceToAppearInOS(ifname common.AdapterName) (*net.Interface, error) {
+func pollForInterfaceToAppearInOS(ifname string) (*net.Interface, error) {
 	var iface *net.Interface = nil
 	ifaceGetterFunc := func() error {
 		var err error
-		iface, err = net.InterfaceByName(string(ifname))
+		iface, err = net.InterfaceByName(ifname)
 		return err
 	}
-	err := retry.Retry(ifaceGetterFunc, common.AdapterReconnectMaxRetries, common.AdapterPollingRate)
+	err := retry.Retry(ifaceGetterFunc, adapterReconnectMaxRetries, adapterPollingRate)
 	return iface, err
 }
 
@@ -51,7 +61,7 @@ func waitForValidIPv4Address(iface Interface) error {
 		_, err := GetValidIpv4Address(iface)
 		return err
 	}
-	return retry.Retry(ifaceCheckerFunc, common.AdapterReconnectMaxRetries, common.AdapterPollingRate)
+	return retry.Retry(ifaceCheckerFunc, adapterReconnectMaxRetries, adapterPollingRate)
 }
 
 func GetValidIpv4Address(iface Interface) (net.IP, error) {

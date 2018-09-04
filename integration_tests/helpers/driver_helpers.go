@@ -26,7 +26,6 @@ import (
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hyperv_extension"
 	netSim "github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/simulator"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/port_association/agent"
-	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/core/driver_core"
 	"github.com/Juniper/contrail-windows-docker-driver/core/ports"
 	"github.com/Juniper/contrail-windows-docker-driver/core/vrouter"
@@ -51,7 +50,7 @@ func NewIntegrationModulesUnderTest() (vr ports.VRouter, d *cnm.ServerCNM, c por
 
 	c = controller_rest.NewFakeControllerAdapter()
 
-	p, err = c.NewProject(common.DomainName, TenantName)
+	p, err = c.NewProject(controller_rest.DomainName, TenantName)
 	Expect(err).ToNot(HaveOccurred())
 
 	netRepo = &netSim.InMemContrailNetworksRepository{}

@@ -25,12 +25,13 @@ import (
 	contrail "github.com/Juniper/contrail-go-api"
 	"github.com/Juniper/contrail-go-api/config"
 	"github.com/Juniper/contrail-go-api/types"
-	"github.com/Juniper/contrail-windows-docker-driver/common"
 	log "github.com/sirupsen/logrus"
 )
 
-type Info struct {
-}
+const (
+	// DomainName specifies domain name in Contrail
+	DomainName = "default-domain"
+)
 
 type ControllerAdapterImpl struct {
 	ApiClient contrail.ApiClient
@@ -88,7 +89,7 @@ func (c *ControllerAdapterImpl) CreateNetworkWithSubnet(tenantName, networkName,
 		}
 		return nil, errors.New("such network already has a different subnet")
 	}
-	projectFQName := fmt.Sprintf("%s:%s", common.DomainName, tenantName)
+	projectFQName := fmt.Sprintf("%s:%s", DomainName, tenantName)
 	project, err := c.ApiClient.FindByName("project", projectFQName)
 	if err != nil {
 		return nil, err
@@ -108,7 +109,7 @@ func (c *ControllerAdapterImpl) CreateNetworkWithSubnet(tenantName, networkName,
 
 func (c *ControllerAdapterImpl) GetNetwork(tenantName, networkName string) (*types.VirtualNetwork,
 	error) {
-	name := fmt.Sprintf("%s:%s:%s", common.DomainName, tenantName, networkName)
+	name := fmt.Sprintf("%s:%s:%s", DomainName, tenantName, networkName)
 	net, err := types.VirtualNetworkByName(c.ApiClient, name)
 	if err != nil {
 		log.Errorf("Failed to get virtual network %s by name: %v", name, err)
@@ -251,7 +252,7 @@ func (c *ControllerAdapterImpl) GetInstance(containerId string) (
 func (c *ControllerAdapterImpl) GetExistingInterface(net *types.VirtualNetwork, tenantName,
 	containerId string) (*types.VirtualMachineInterface, error) {
 
-	fqName := fmt.Sprintf("%s:%s:%s", common.DomainName, tenantName, containerId)
+	fqName := fmt.Sprintf("%s:%s:%s", DomainName, tenantName, containerId)
 	iface, err := types.VirtualMachineInterfaceByName(c.ApiClient, fqName)
 	if err != nil {
 		return nil, err
@@ -267,14 +268,14 @@ func (c *ControllerAdapterImpl) GetExistingInterface(net *types.VirtualNetwork, 
 func (c *ControllerAdapterImpl) GetOrCreateInterface(net *types.VirtualNetwork, tenantName,
 	containerId string) (*types.VirtualMachineInterface, error) {
 
-	fqName := fmt.Sprintf("%s:%s:%s", common.DomainName, tenantName, containerId)
+	fqName := fmt.Sprintf("%s:%s:%s", DomainName, tenantName, containerId)
 	iface, err := types.VirtualMachineInterfaceByName(c.ApiClient, fqName)
 	if err == nil && iface != nil {
 		return iface, nil
 	}
 
 	iface = new(types.VirtualMachineInterface)
-	iface.SetFQName("project", []string{common.DomainName, tenantName, containerId})
+	iface.SetFQName("project", []string{DomainName, tenantName, containerId})
 	err = iface.AddVirtualNetwork(net)
 	if err != nil {
 		log.Errorf("Failed to add network to interface: %v", err)
@@ -304,7 +305,7 @@ func (c *ControllerAdapterImpl) GetOrCreateInterface(net *types.VirtualNetwork, 
 }
 
 func (c *ControllerAdapterImpl) assignDefaultSecurityGroup(iface *types.VirtualMachineInterface, tenantName string) error {
-	secGroupFqName := fmt.Sprintf("%s:%s:default", common.DomainName, tenantName)
+	secGroupFqName := fmt.Sprintf("%s:%s:default", DomainName, tenantName)
 	secGroup, err := types.SecurityGroupByName(c.ApiClient, secGroupFqName)
 	if err != nil || secGroup == nil {
 		return fmt.Errorf("Failed to retrieve security group %s by name: %v", secGroupFqName, err)

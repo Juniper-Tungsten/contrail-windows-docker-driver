@@ -21,9 +21,27 @@ import (
 	"time"
 
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns/win_networking"
-	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Microsoft/hcsshim"
 	log "github.com/sirupsen/logrus"
+)
+
+const (
+	// rootNetworkName is a name of root HNS network created solely for the purpose of
+	// having a virtual switch
+	rootNetworkName = "ContrailRootNetwork"
+
+	// createHNSNetworkInitialRetryDelay is a delay between consecutive attemps
+	// to create HNSNetwork. After each retry, the delay is increased to
+	// give HNS more time to cool down.
+	createHNSNetworkInitialRetryDelay = 5 * time.Second
+
+	// createHNSNetworkTimeout is maximum waiting time for CreateHNSNetwork
+	// in case of retrying. This should be greater than CreateHNSNetworkInitialRetryDelay
+	// and AdapterReconnectTimeout combined for the retry to be attempted.
+	createHNSNetworkTimeout = 90 * time.Second
+
+	// hnsTransparentInterfaceName is the name of transparent HNS vswitch interface name
+	hnsTransparentInterfaceName = "vEthernet (HNSTransparent)"
 )
 
 type recoverableError struct {
@@ -34,11 +52,11 @@ func (e *recoverableError) Error() string {
 	return e.inner.Error()
 }
 
-func InitRootHNSNetwork(nameOfAdapterToUse common.AdapterName) error {
+func InitRootHNSNetwork(nameOfAdapterToUse string) error {
 	// HNS automatically creates a new vswitch if the first HNS network is created. We want to
 	// control this behaviour. That's why we create a dummy root HNS network.
 
-	rootNetwork, err := GetHNSNetworkByName(common.RootNetworkName)
+	rootNetwork, err := GetHNSNetworkByName(rootNetworkName)
 	if err != nil {
 		return err
 	}
@@ -50,9 +68,9 @@ func InitRootHNSNetwork(nameOfAdapterToUse common.AdapterName) error {
 			},
 		}
 		configuration := &hcsshim.HNSNetwork{
-			Name:               common.RootNetworkName,
+			Name:               rootNetworkName,
 			Type:               "transparent",
-			NetworkAdapterName: string(nameOfAdapterToUse),
+			NetworkAdapterName: nameOfAdapterToUse,
 			Subnets:            subnets,
 		}
 		// Before we CreateHNSNetwork we need to make sure, that interface we want to attach the vmswitch
@@ -90,7 +108,7 @@ func tryCreateHNSNetwork(config string) (string, error) {
 	// specified network adapter. This adapter will temporarily lose network connectivity
 	// while it reacquires IPv4. We need to wait for it.
 	// https://github.com/Microsoft/hcsshim/issues/108
-	if err := win_networking.WaitForValidIPReacquisition(common.HNSTransparentInterfaceName); err != nil {
+	if err := win_networking.WaitForValidIPReacquisition(hnsTransparentInterfaceName); err != nil {
 		log.Errorln(err)
 
 		deleteErr := DeleteHNSNetwork(response.Id)
@@ -114,14 +132,14 @@ func CreateHNSNetwork(configuration *hcsshim.HNSNetwork) (string, error) {
 	log.Debugln("Config:", string(configBytes))
 
 	var id = ""
-	delay := common.CreateHNSNetworkInitialRetryDelay
+	delay := createHNSNetworkInitialRetryDelay
 	creatingStart := time.Now()
 	for {
 		id, err = tryCreateHNSNetwork(string(configBytes))
 		if err != nil {
 			if recoverableErr, ok := err.(*recoverableError); ok {
 				err = recoverableErr.inner
-				if time.Since(creatingStart) < common.CreateHNSNetworkTimeout {
+				if time.Since(creatingStart) < createHNSNetworkTimeout {
 					log.Warnln("Creating HNS network failed. Sleeping for ", delay, "ms before retrying.")
 					time.Sleep(delay)
 					delay *= 2
@@ -173,8 +191,7 @@ func DeleteHNSNetwork(hnsID string) error {
 		// also deleted. During this period, the adapter will temporarily lose network
 		// connectivity while it reacquires IPv4. We need to wait for it.
 		// https://github.com/Microsoft/hcsshim/issues/95
-		if err := win_networking.WaitForValidIPReacquisition(
-			common.AdapterName(toDelete.NetworkAdapterName)); err != nil {
+		if err := win_networking.WaitForValidIPReacquisition(toDelete.NetworkAdapterName); err != nil {
 			log.Errorln(err)
 			return err
 		}

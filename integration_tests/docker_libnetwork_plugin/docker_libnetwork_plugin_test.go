@@ -27,7 +27,6 @@ import (
 	"github.com/Juniper/contrail-go-api/types"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/primary/cnm"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns/win_networking"
-	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/core/ports"
 	"github.com/Juniper/contrail-windows-docker-driver/integration_tests/helpers"
 	sockets "github.com/Microsoft/go-winio"
@@ -110,13 +109,13 @@ var _ = Describe("Contrail Docker Libnetwork Plugin registering and listening", 
 		err := server.StartServing()
 		Expect(err).ToNot(HaveOccurred())
 
-		_, err = os.Stat(common.PluginSpecFilePath())
+		_, err = os.Stat(server.PluginSpecFilePath())
 		Expect(os.IsNotExist(err)).To(BeFalse())
 
 		err = server.StopServing()
 		Expect(err).ToNot(HaveOccurred())
 
-		_, err = os.Stat(common.PluginSpecFilePath())
+		_, err = os.Stat(server.PluginSpecFilePath())
 		Expect(os.IsNotExist(err)).To(BeTrue())
 	})
 
@@ -135,7 +134,7 @@ var _ = Describe("Contrail Docker Libnetwork Plugin registering and listening", 
 		err = server.StopServing()
 		Expect(err).ToNot(HaveOccurred())
 
-		err = common.RestartDocker()
+		err = helpers.RestartDocker()
 		Expect(err).ToNot(HaveOccurred())
 	})
 })
@@ -186,7 +185,7 @@ func createValidDockerNetwork(docker *dockerClient.Client) string {
 
 func createDockerNetwork(tenant, network string, docker *dockerClient.Client) string {
 	params := &dockerTypes.NetworkCreate{
-		Driver: common.DriverName,
+		Driver: cnm.DriverName,
 		IPAM: &dockerTypesNetwork.IPAM{
 			// libnetwork/ipams/windowsipam ("windows") driver is a null ipam driver.
 			// We use 0/32 subnet because no preferred address is specified (as documented in
@@ -213,11 +212,11 @@ func createDockerNetwork(tenant, network string, docker *dockerClient.Client) st
 }
 
 func cleanupAll() {
-	err := common.RestartDocker()
+	err := helpers.RestartDocker()
 	Expect(err).ToNot(HaveOccurred())
-	err = common.HardResetHNS()
+	err = helpers.HardResetHNS()
 	Expect(err).ToNot(HaveOccurred())
-	err = win_networking.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
+	err = win_networking.WaitForValidIPReacquisition(netAdapter)
 	Expect(err).ToNot(HaveOccurred())
 
 	docker := getDockerClient()

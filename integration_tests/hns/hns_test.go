@@ -27,7 +27,6 @@ import (
 
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns/win_networking"
-	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/core/model"
 	"github.com/Juniper/contrail-windows-docker-driver/integration_tests/helpers"
 	"github.com/Microsoft/hcsshim"
@@ -62,17 +61,17 @@ func TestHNS(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	// Code disabled: cannot mark 'BeforeSuite' block as Pending...
-	// err := common.HardResetHNS()
+	// err := helpers.HardResetHNS()
 	// Expect(err).ToNot(HaveOccurred())
-	// err = win_networking.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
+	// err = win_networking.WaitForValidIPReacquisition(netAdapter)
 	// Expect(err).ToNot(HaveOccurred())
 })
 
 var _ = AfterSuite(func() {
 	// Code disabled: cannot mark 'BeforeSuite' block as Pending...
-	// err := common.HardResetHNS()
+	// err := helpers.HardResetHNS()
 	// Expect(err).ToNot(HaveOccurred())
-	// err = win_networking.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
+	// err = win_networking.WaitForValidIPReacquisition(netAdapter)
 	// Expect(err).ToNot(HaveOccurred())
 })
 
@@ -103,9 +102,9 @@ var _ = PDescribe("HNSContrailNetworksRepository", func() {
 	})
 
 	AfterEach(func() {
-		err := common.HardResetHNS()
+		err := helpers.HardResetHNS()
 		Expect(err).ToNot(HaveOccurred())
-		err = win_networking.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
+		err = win_networking.WaitForValidIPReacquisition(netAdapter)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -188,7 +187,7 @@ var _ = PDescribe("HNSContrailNetworksRepository", func() {
 				"some_other_name",
 			}
 			for _, n := range names {
-				helpers.CreateTestHNSNetwork(common.AdapterName(netAdapter), n, subnetCIDR, defaultGW)
+				helpers.CreateTestHNSNetwork(netAdapter, n, subnetCIDR, defaultGW)
 			}
 		})
 		Specify("Listing only Contrail networks works", func() {
@@ -218,7 +217,7 @@ var _ = PDescribe("HNS wrapper", func() {
 			expectNumberOfEndpoints(0)
 
 			Expect(testHnsNetID).To(Equal(""))
-			testHnsNetID = helpers.CreateTestHNSNetwork(common.AdapterName(netAdapter), testNetName, subnetCIDR,
+			testHnsNetID = helpers.CreateTestHNSNetwork(netAdapter, testNetName, subnetCIDR,
 				defaultGW)
 			Expect(testHnsNetID).ToNot(Equal(""))
 
@@ -351,7 +350,7 @@ var _ = PDescribe("HNS wrapper", func() {
 		Context("There's a second HNS network", func() {
 			secondHNSNetID := ""
 			BeforeEach(func() {
-				secondHNSNetID = helpers.CreateTestHNSNetwork(common.AdapterName(netAdapter), "other_net_name",
+				secondHNSNetID = helpers.CreateTestHNSNetwork(netAdapter, "other_net_name",
 					subnetCIDR, defaultGW)
 
 			})
@@ -539,9 +538,9 @@ var _ = PDescribe("HNS race conditions workarounds", func() {
 		}
 
 		targetAddr = fmt.Sprintf("%s:%v", controllerAddr, controllerPort)
-		err := common.HardResetHNS()
+		err := helpers.HardResetHNS()
 		Expect(err).ToNot(HaveOccurred())
-		err = win_networking.WaitForValidIPReacquisition(common.AdapterName(netAdapter))
+		err = win_networking.WaitForValidIPReacquisition(netAdapter)
 		Expect(err).ToNot(HaveOccurred())
 	})
 

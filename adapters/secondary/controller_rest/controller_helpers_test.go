@@ -27,7 +27,6 @@ import (
 	"github.com/Juniper/contrail-go-api/types"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/api"
-	"github.com/Juniper/contrail-windows-docker-driver/common"
 	. "github.com/onsi/gomega"
 	log "github.com/sirupsen/logrus"
 )
@@ -36,7 +35,7 @@ func NewTestClientAndProject(tenant string) (*controller_rest.ControllerAdapterI
 	fakeApiClient := api.NewFakeApiClient()
 	c := controller_rest.NewControllerAdapterImpl(fakeApiClient)
 
-	project, err := c.NewProject(common.DomainName, tenant)
+	project, err := c.NewProject(controller_rest.DomainName, tenant)
 	Expect(err).ToNot(HaveOccurred())
 	return c, project
 }
@@ -65,7 +64,7 @@ func CreateTestNetwork(c contrail.ApiClient, netName string,
 
 func RemoveTestSecurityGroup(c contrail.ApiClient, groupName string,
 	project *types.Project) {
-	secGroupFqName := fmt.Sprintf("%s:%s:default", common.DomainName, tenantName)
+	secGroupFqName := fmt.Sprintf("%s:%s:default", controller_rest.DomainName, tenantName)
 	secGroup, err := types.SecurityGroupByName(c, secGroupFqName)
 	err = c.Delete(secGroup)
 	Expect(err).ToNot(HaveOccurred())
@@ -113,7 +112,7 @@ func CreateMockedInterface(c contrail.ApiClient, net *types.VirtualNetwork, tena
 	containerId string) *types.VirtualMachineInterface {
 	iface := new(types.VirtualMachineInterface)
 
-	iface.SetFQName("project", []string{common.DomainName, tenantName, containerId})
+	iface.SetFQName("project", []string{controller_rest.DomainName, tenantName, containerId})
 
 	err := iface.AddVirtualNetwork(net)
 	Expect(err).ToNot(HaveOccurred())
@@ -149,7 +148,7 @@ func CreateTestInstanceIP(c contrail.ApiClient, tenantName string,
 }
 
 func ForceDeleteProject(c *controller_rest.ControllerAdapterImpl, tenant string) {
-	projToDelete, _ := c.ApiClient.FindByName("project", fmt.Sprintf("%s:%s", common.DomainName,
+	projToDelete, _ := c.ApiClient.FindByName("project", fmt.Sprintf("%s:%s", controller_rest.DomainName,
 		tenant))
 	if projToDelete != nil {
 		ForceDeleteElementRecursive(c, projToDelete)

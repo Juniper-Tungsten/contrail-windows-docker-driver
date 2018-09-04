@@ -18,8 +18,11 @@ package hns
 import (
 	"fmt"
 	"strings"
+)
 
-	"github.com/Juniper/contrail-windows-docker-driver/common"
+const (
+	// hnsNetworkPrefix is a prefix given too all HNS network names managed by the driver
+	hnsNetworkPrefix = "Contrail"
 )
 
 // HNSDBNetworkAssociationMechanism is used for associating docker, HNS and Contrail networks
@@ -27,7 +30,7 @@ import (
 type HNSDBNetworkAssociationMechanism struct{}
 
 func (m HNSDBNetworkAssociationMechanism) GenerateName(dockerNetID, contrailTenantName, contrailNetworkName, contrailSubnetCIDR string) string {
-	return fmt.Sprintf("%s:%s:%s:%s:%s", common.HNSNetworkPrefix, dockerNetID, contrailTenantName,
+	return fmt.Sprintf("%s:%s:%s:%s:%s", hnsNetworkPrefix, dockerNetID, contrailTenantName,
 		contrailNetworkName, contrailSubnetCIDR)
 }
 
@@ -42,5 +45,5 @@ func (m HNSDBNetworkAssociationMechanism) SplitName(name string) (dockerNetID, t
 
 func (m HNSDBNetworkAssociationMechanism) IsOwnedByDriver(name string) bool {
 	split := strings.Split(name, ":")
-	return split[0] == common.HNSNetworkPrefix
+	return split[0] == hnsNetworkPrefix
 }

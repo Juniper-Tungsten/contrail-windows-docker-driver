@@ -24,15 +24,27 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"path/filepath"
 	"time"
 
-	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/core/driver_core"
 	winio "github.com/Microsoft/go-winio"
 	"github.com/docker/go-connections/sockets"
 	"github.com/docker/go-plugins-helpers/network"
-	"github.com/docker/libnetwork/netlabel"
 	log "github.com/sirupsen/logrus"
+)
+
+const (
+	// DriverName is name of the driver that is to be specified during docker network creation
+	DriverName = "Contrail"
+
+	// pipePollingTimeout is time to wait for named pipe to appear/disappear in the
+	// filesystem
+	pipePollingTimeout = 5 * time.Second
+
+	// pipePollingRate is rate of polling named pipe if it appeared/disappeared in the
+	// filesystem yet
+	pipePollingRate = 300 * time.Millisecond
 )
 
 type ServerCNM struct {
@@ -57,7 +69,7 @@ type NetworkMeta struct {
 func NewServerCNM(core *driver_core.ContrailDriverCore) *ServerCNM {
 	d := &ServerCNM{
 		Core:               core,
-		PipeAddr:           "//./pipe/" + common.DriverName,
+		PipeAddr:           "//./pipe/" + DriverName,
 		stopReasonChan:     make(chan error, 1),
 		stoppedServingChan: make(chan interface{}, 1),
 		IsServing:          false,
@@ -115,13 +127,13 @@ func (d *ServerCNM) StartServing() error {
 			return
 		}
 
-		if err := os.MkdirAll(common.PluginSpecDir(), 0755); err != nil {
+		if err := os.MkdirAll(d.pluginSpecDir(), 0755); err != nil {
 			failedChan <- errors.New(fmt.Sprintln("When setting up plugin spec directory:", err))
 			return
 		}
 
 		url := "npipe://" + d.listener.Addr().String()
-		if err := ioutil.WriteFile(common.PluginSpecFilePath(), []byte(url), 0644); err != nil {
+		if err := ioutil.WriteFile(d.PluginSpecFilePath(), []byte(url), 0644); err != nil {
 			failedChan <- errors.New(fmt.Sprintln("When creating spec file:", err))
 			return
 		}
@@ -139,7 +151,7 @@ func (d *ServerCNM) StartServing() error {
 		}
 
 		log.Infoln("Removing spec file")
-		if err := os.Remove(common.PluginSpecFilePath()); err != nil {
+		if err := os.Remove(d.PluginSpecFilePath()); err != nil {
 			log.Warnln("When removing spec file:", err)
 		}
 
@@ -168,171 +180,14 @@ func (d *ServerCNM) StopServing() error {
 	return nil
 }
 
-func (d *ServerCNM) GetCapabilities() (*network.CapabilitiesResponse, error) {
-	log.Debugln("Received GetCapabilities request from docker daemon")
-	r := &network.CapabilitiesResponse{}
-	r.Scope = network.LocalScope
-	return r, nil
+// PluginSpecFilePath returns path to plugin spec file.
+func (d *ServerCNM) PluginSpecFilePath() string {
+	return filepath.Join(d.pluginSpecDir(), DriverName+".spec")
 }
 
-func (d *ServerCNM) CreateNetwork(req *network.CreateNetworkRequest) error {
-	log.Debugln("Received CreateNetwork request from docker daemon:", req)
-
-	reqGenericOptionsMap, exists := req.Options[netlabel.GenericData]
-	if !exists {
-		return errors.New("Generic options missing")
-	}
-
-	genericOptions, ok := reqGenericOptionsMap.(map[string]interface{})
-	if !ok {
-		return errors.New("Malformed generic options")
-	}
-
-	tenant, exists := genericOptions["tenant"]
-	if !exists {
-		return errors.New("Tenant not specified")
-	}
-
-	netName, exists := genericOptions["network"]
-	if !exists {
-		return errors.New("Network name not specified")
-	}
-
-	// this is subnet already in CIDR format
-	if len(req.IPv4Data) == 0 {
-		return errors.New("Docker subnet IPv4 data missing")
-	}
-	subnetCIDR := req.IPv4Data[0].Pool
-
-	tenantName := tenant.(string)
-	networkName := netName.(string)
-
-	return d.Core.CreateNetwork(req.NetworkID, tenantName, networkName, subnetCIDR)
-}
-
-func (d *ServerCNM) AllocateNetwork(req *network.AllocateNetworkRequest) (
-	*network.AllocateNetworkResponse, error) {
-	log.Debugln("Received AllocateNetwork request from docker daemon:", req)
-	// This method is used in swarm, in remote plugins. We don't implement it.
-	return nil, errors.New("AllocateNetwork is not implemented")
-}
-
-func (d *ServerCNM) DeleteNetwork(req *network.DeleteNetworkRequest) error {
-	log.Debugln("Received DeleteNetwork request from docker daemon:", req)
-
-	return d.Core.DeleteNetwork(req.NetworkID)
-}
-
-func (d *ServerCNM) FreeNetwork(req *network.FreeNetworkRequest) error {
-	log.Debugln("Received FreeNetwork request from docker daemon:", req)
-
-	// This method is used in swarm, in remote plugins. We don't implement it.
-	return errors.New("FreeNetwork is not implemented")
-}
-
-func (d *ServerCNM) CreateEndpoint(req *network.CreateEndpointRequest) (
-	*network.CreateEndpointResponse, error) {
-	log.Debugln("Received CreateEndpoint request from docker daemon:", req)
-
-	container, err := d.Core.CreateEndpoint(req.NetworkID, req.EndpointID)
-	if err != nil {
-		return nil, err
-	}
-
-	ipCIDR := fmt.Sprintf("%s/%v", container.IP, container.PrefixLen)
-	r := &network.CreateEndpointResponse{
-		Interface: &network.EndpointInterface{
-			Address:    ipCIDR,
-			MacAddress: container.Mac,
-		},
-	}
-	return r, nil
-}
-
-func (d *ServerCNM) DeleteEndpoint(req *network.DeleteEndpointRequest) error {
-	log.Debugln("Received DeleteEndpoint request from docker daemon:", req)
-
-	return d.Core.DeleteEndpoint(req.NetworkID, req.EndpointID)
-}
-
-func (d *ServerCNM) EndpointInfo(req *network.InfoRequest) (*network.InfoResponse, error) {
-	log.Debugln("Received EndpointInfo request from docker daemon:", req)
-
-	hnsEpName := req.EndpointID
-	hnsEp, err := d.Core.LocalContrailEndpointsRepo.GetEndpoint(hnsEpName)
-	if err != nil {
-		return nil, err
-	}
-	if hnsEp == nil {
-		return nil, errors.New("When handling EndpointInfo, couldn't find HNS endpoint")
-	}
-
-	respData := map[string]string{
-		"hnsid":             hnsEp.Id,
-		netlabel.MacAddress: hnsEp.MacAddress,
-	}
-
-	r := &network.InfoResponse{
-		Value: respData,
-	}
-	return r, nil
-}
-
-func (d *ServerCNM) Join(req *network.JoinRequest) (*network.JoinResponse, error) {
-	log.Debugln("Received Join request from docker daemon:", req)
-
-	hnsEp, err := d.Core.LocalContrailEndpointsRepo.GetEndpoint(req.EndpointID)
-	if err != nil {
-		return nil, err
-	}
-	if hnsEp == nil {
-		return nil, errors.New("Such HNS endpoint doesn't exist")
-	}
-
-	r := &network.JoinResponse{
-		DisableGatewayService: true,
-		Gateway:               hnsEp.GatewayAddress,
-	}
-
-	return r, nil
-}
-
-func (d *ServerCNM) Leave(req *network.LeaveRequest) error {
-	log.Debugln("Received Leave request from docker daemon:", req)
-
-	hnsEp, err := d.Core.LocalContrailEndpointsRepo.GetEndpoint(req.EndpointID)
-	if err != nil {
-		return err
-	}
-	if hnsEp == nil {
-		return errors.New("Such HNS endpoint doesn't exist")
-	}
-
-	return nil
-}
-
-func (d *ServerCNM) DiscoverNew(req *network.DiscoveryNotification) error {
-	log.Debugln("Received DiscoverNew request from docker daemon:", req)
-	// We don't care about discovery notifications.
-	return nil
-}
-
-func (d *ServerCNM) DiscoverDelete(req *network.DiscoveryNotification) error {
-	log.Debugln("Received DiscoverDelete request from docker daemon:", req)
-	// We don't care about discovery notifications.
-	return nil
-}
-
-func (d *ServerCNM) ProgramExternalConnectivity(
-	req *network.ProgramExternalConnectivityRequest) error {
-	log.Debugln("Received ProgramExternalConnectivity request from docker daemon:", req)
-	return nil
-}
-
-func (d *ServerCNM) RevokeExternalConnectivity(
-	req *network.RevokeExternalConnectivityRequest) error {
-	log.Debugln("Received RevokeExternalConnectivity request from docker daemon:", req)
-	return nil
+func (d *ServerCNM) pluginSpecDir() string {
+	// returns path to directory where docker daemon looks for plugin spec files.
+	return filepath.Join(os.Getenv("programdata"), "docker", "plugins")
 }
 
 func (d *ServerCNM) waitForPipeToAppear() error {
@@ -346,7 +201,7 @@ func (d *ServerCNM) waitForPipeToStop() error {
 func (d *ServerCNM) waitForPipe(waitUntilExists bool) error {
 	timeStarted := time.Now()
 	for {
-		if time.Since(timeStarted) > common.PipePollingTimeout {
+		if time.Since(timeStarted) > pipePollingTimeout {
 			return errors.New("Waited for pipe file for too long.")
 		}
 
@@ -360,7 +215,7 @@ func (d *ServerCNM) waitForPipe(waitUntilExists bool) error {
 			log.Warnf("Waiting for pipe file, but: %s", err)
 		}
 
-		time.Sleep(common.PipePollingRate)
+		time.Sleep(pipePollingRate)
 	}
 
 	return nil
@@ -369,7 +224,7 @@ func (d *ServerCNM) waitForPipe(waitUntilExists bool) error {
 func (d *ServerCNM) waitUntilPipeDialable() error {
 	timeStarted := time.Now()
 	for {
-		if time.Since(timeStarted) > common.PipePollingTimeout {
+		if time.Since(timeStarted) > pipePollingTimeout {
 			return errors.New("Waited for pipe to be dialable for too long.")
 		}
 
@@ -382,6 +237,6 @@ func (d *ServerCNM) waitUntilPipeDialable() error {
 
 		log.Warnf("Waiting until dialable, but: %s", err)
 
-		time.Sleep(common.PipePollingRate)
+		time.Sleep(pipePollingRate)
 	}
 }

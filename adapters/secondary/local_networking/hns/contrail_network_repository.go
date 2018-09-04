@@ -18,7 +18,6 @@ package hns
 import (
 	"errors"
 
-	"github.com/Juniper/contrail-windows-docker-driver/common"
 	"github.com/Juniper/contrail-windows-docker-driver/core/model"
 	"github.com/Microsoft/hcsshim"
 )
@@ -33,11 +32,11 @@ type HNSContrailNetworksRepository struct {
 	// physDataplaneNetAdapter is the name of physical dataplane adapter that we should attach our
 	// Contrail networks to, e.g. Ethernet0. It is NOT the adapter created by HNS (e.g. "HNS
 	// Transparent").
-	physDataplaneNetAdapter common.AdapterName
+	physDataplaneNetAdapter string
 	associations            HNSDBNetworkAssociationMechanism
 }
 
-func NewHNSContrailNetworksRepository(physDataplaneNetAdapter common.AdapterName) (*HNSContrailNetworksRepository, error) {
+func NewHNSContrailNetworksRepository(physDataplaneNetAdapter string) (*HNSContrailNetworksRepository, error) {
 	if err := InitRootHNSNetwork(physDataplaneNetAdapter); err != nil {
 		return nil, err
 	}
