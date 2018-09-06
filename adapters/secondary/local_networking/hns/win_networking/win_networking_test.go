@@ -1,4 +1,3 @@
-// +build unit
 //
 // Copyright (c) 2018 Juniper Networks, Inc. All Rights Reserved.
 //
@@ -13,6 +12,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+// +build unit
 
 package win_networking_test
 
@@ -85,7 +86,7 @@ var _ = Describe("GetValidIpv4Address", func() {
 	It("returns nil and error if it doesn't have an ipv4 address", func() {
 		iface := &FakeInterface{
 			addrs: []net.Addr{
-			// intentionally left empty
+				// intentionally left empty
 			},
 		}
 		ip, err := win_networking.GetValidIpv4Address(iface)
