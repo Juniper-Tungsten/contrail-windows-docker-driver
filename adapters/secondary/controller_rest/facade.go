@@ -137,10 +137,12 @@ func (c *ControllerAdapter) GetContainer(containerID string) (*model.Container, 
 		return nil, err
 	}
 
-	// one endpoint supported for now
 	vmiRefs, err := vm.GetVirtualMachineInterfaceBackRefs()
 	if err != nil {
 		return nil, err
+	}
+	if len(vmiRefs) != 1 {
+		return nil, errors.New("For now, only one VMI per endpoint is supported.")
 	}
 	vmiObj, err := c.controller.ApiClient.FindByUuid("virtual-machine-interface", vmiRefs[0].Uuid)
 	if err != nil {
@@ -148,10 +150,12 @@ func (c *ControllerAdapter) GetContainer(containerID string) (*model.Container, 
 	}
 	vmi := vmiObj.(*types.VirtualMachineInterface)
 
-	// one instance ip per endpoint supported for now
 	iipRefs, err := vmi.GetInstanceIpBackRefs()
 	if err != nil {
 		return nil, err
+	}
+	if len(iipRefs) != 1 {
+		return nil, errors.New("For now, nly one InstanceIP per endpoint is supported.")
 	}
 	iipObj, err := c.controller.ApiClient.FindByUuid("instance-ip", iipRefs[0].Uuid)
 	if err != nil {
@@ -159,10 +163,12 @@ func (c *ControllerAdapter) GetContainer(containerID string) (*model.Container, 
 	}
 	iip := iipObj.(*types.InstanceIp)
 
-	// one network per vmi supported for now
 	vnRefs, err := iip.GetVirtualNetworkRefs()
 	if err != nil {
 		return nil, err
+	}
+	if len(vnRefs) != 1 {
+		return nil, errors.New("For now, only one virtual network per endpoint is supported.")
 	}
 	vnObj, err := c.controller.ApiClient.FindByUuid("virtual-network", vnRefs[0].Uuid)
 	if err != nil {

@@ -66,17 +66,6 @@ func (core *ContrailDriverCore) CreateNetwork(dockerNetID, tenantName, networkNa
 		return errors.New("Retrieved Contrail network is nil")
 	}
 
-	log.Debugln("Got Contrail network", network.NetworkName)
-
-	gateway := network.Subnet.DefaultGW
-	if gateway == "" {
-		// TODO: this fails in unit tests using contrail-go-api mock. So either:
-		// * fix contrail-go-api mock to return *some* default GW
-		// * or maybe we should keep going if default GW is empty, as a user may wish not
-		//   to specify it. (this is what we do now, and just generate a warning)
-		log.Warn("Default GW is empty")
-	}
-
 	return core.LocalContrailNetworksRepo.CreateNetwork(dockerNetID, network)
 }
 
@@ -128,11 +117,18 @@ func (core *ContrailDriverCore) DeleteEndpoint(dockerNetID, endpointID string) e
 }
 
 func (core *ContrailDriverCore) getIdOfContainerWithEndpoint(endpointID string) string {
-	// WORKAROUND: We need to retreive Container ID here and use it instead of EndpointID as
-	// argument to GetOrCreateInstance(). EndpointID is equiv to interface, but in Contrail,
-	// we have a "VirtualMachine" in data model. A single VM can be connected to two or more
-	// overlay networks, but when we use EndpointID, this won't work. We need something like:
-	// containerID := req.Options["vmname"]
+	// WORKAROUND:
+	// At the time of handling CreateEndpoint request, docker container doesn't exist yet, and
+	// there is no way of knowing what will docker container ID be. CNM spec gives us only endpoint
+	// ID in the request.
+	// This is problematic, because in Contrail, a single VM (or container) can have multiple
+	// endpoints.
+	// For now, the workaround is to just assume that container ID is equal to endpoind ID.
+	// A slightly better solution would be to pass an additional parameter, like `-opt vmname=1234`
+	// to `docker run` command. Then, we could use `containerID := req.Options["vmname"]`. However,
+	// `docker run` doesn't support custom options.
+	// Another solution would be to investigate newer HNS APIs, because they introduce some kind of
+	// how interface adding feature.
 	containerID := endpointID
 	return containerID
 }
@@ -155,6 +151,15 @@ func (core *ContrailDriverCore) createContainerEndpointInLocalNetwork(container 
 }
 
 func (core *ContrailDriverCore) associatePort(container *model.Container, ep *model.LocalEndpoint) {
+	// WORKAROUND:
+	// Normally, we would wait for result of AddPort request, but we would wait forever,
+	// because no container would be created until we return from CreateEndpoint request.
+	// This is because docker daemon first waits for plugins, and only after it receives
+	// responses, creates the container.
+	// The second part of this workaround consists of polling for interface to appear
+	// in the OS upon receiving the AddPort request in vRouter Agent code.
+	// See contrail-controller/src/vnsw/agent/oper/windows/interface_params.cc,
+	// function GetVmInterfaceLuidFromName.
 	go func() {
 		err := core.portAssociation.AddPort(container.VmUUID, container.VmiUUID, ep.IfName,
 			container.Mac, ep.Name, container.IP.String(), container.NetUUID)
@@ -166,6 +171,8 @@ func (core *ContrailDriverCore) associatePort(container *model.Container, ep *mo
 }
 
 func (core *ContrailDriverCore) disassociatePort(container *model.Container) {
+	// WORKAROUND:
+	// Refer to comment for associatePort.
 	go func() {
 		err := core.portAssociation.DeletePort(container.VmiUUID)
 		if err != nil {

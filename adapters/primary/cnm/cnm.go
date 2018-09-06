@@ -78,6 +78,7 @@ func NewServerCNM(core *driver_core.ContrailDriverCore) *ServerCNM {
 }
 
 func (d *ServerCNM) StartServing() error {
+	// TODO: This method really needs some refactoring.
 
 	if d.IsServing {
 		return errors.New("Already serving.")
