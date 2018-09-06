@@ -52,7 +52,6 @@ type Controller interface {
 	DeleteContainer(containerID string) error
 	GetContainer(containerID string) (*model.Container, error)
 
-	// This method is only used by tests; to remove?
 	NewProject(domain, tenant string) (*types.Project, error)
 
 	// To remove when refactoring plugin.DeleteEndpoint

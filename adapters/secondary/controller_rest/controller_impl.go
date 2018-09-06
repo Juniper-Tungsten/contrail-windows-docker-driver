@@ -29,8 +29,13 @@ import (
 )
 
 const (
-	// DomainName specifies domain name in Contrail
-	DomainName = "default-domain"
+	// Default resources in Contrail
+	DomainName           = "default-domain"
+	DefaultProject       = "default-project"
+	DefaultSecurityGroup = "default"
+	DefaultIPAM          = "default-network-ipam"
+	// Admin project in Contrail
+	AdminProject = "admin"
 )
 
 type ControllerAdapterImpl struct {
@@ -46,8 +51,6 @@ func NewControllerAdapterImpl(apiClient contrail.ApiClient) *ControllerAdapterIm
 	return client
 }
 
-// TODO: this method is only used by tests - it can probably be removed from ControllerAdapterImpl
-// entirely and moved to helpers.
 func (c *ControllerAdapterImpl) NewProject(domain, tenant string) (*types.Project, error) {
 	project := new(types.Project)
 	project.SetFQName("domain", []string{domain, tenant})
@@ -55,23 +58,61 @@ func (c *ControllerAdapterImpl) NewProject(domain, tenant string) (*types.Projec
 		return nil, err
 	}
 
-	// Create security group as soon as project is created. This mimics contrail API server
-	// behaviuor. We can do it here, because NewProject method is used only in tests (see
-	// method comment).
-	if _, err := c.createSecurityGroup(domain, tenant); err != nil {
+	// Create security group and network ipam as soon as project is created.
+	// This reflects contrail orchestrator plugins' behaviour.
+	secGroup, err := c.createSecurityGroup(domain, tenant, DefaultSecurityGroup)
+	if err != nil {
+		if warn := c.ApiClient.Delete(project); warn != nil {
+			log.Warnln("Failed to delete project %s after failed default security group creation: %v", tenant, warn)
+		}
+		return nil, err
+	}
+	if _, err := c.createNetworkIPAM(domain, tenant, DefaultIPAM); err != nil {
+		if warn := c.ApiClient.Delete(secGroup); warn != nil {
+			log.Warnln("Failed to delete default security group after failed default IPAM creation: %v", warn)
+		}
+		if warn := c.ApiClient.Delete(project); warn != nil {
+			log.Warnln("Failed to delete project %s after failed default IPAM creation: %v", tenant, warn)
+		}
 		return nil, err
 	}
 
 	return project, nil
 }
 
-func (c *ControllerAdapterImpl) createSecurityGroup(domain, tenant string) (*types.SecurityGroup, error) {
+func (c *ControllerAdapterImpl) GetOrCreateProject(domain, tenant string) (*types.Project, error) {
+	project, err := c.GetProject(domain, tenant)
+	if err == nil && project != nil {
+		return project, nil
+	}
+	return c.NewProject(domain, tenant)
+}
+
+func (c *ControllerAdapterImpl) GetProject(domain, tenant string) (*types.Project, error) {
+	projectFQName := fmt.Sprintf("%s:%s", domain, tenant)
+	project, err := types.ProjectByName(c.ApiClient, projectFQName)
+	if err != nil {
+		return nil, err
+	}
+	return project, nil
+}
+
+func (c *ControllerAdapterImpl) createSecurityGroup(domain, tenant, name string) (*types.SecurityGroup, error) {
 	secgroup := new(types.SecurityGroup)
-	secgroup.SetFQName("project", []string{domain, tenant, "default"})
+	secgroup.SetFQName("project", []string{domain, tenant, name})
 	if err := c.ApiClient.Create(secgroup); err != nil {
 		return nil, err
 	}
 	return secgroup, nil
+}
+
+func (c *ControllerAdapterImpl) createNetworkIPAM(domain, tenant, name string) (*types.NetworkIpam, error) {
+	ipam := new(types.NetworkIpam)
+	ipam.SetFQName("project", []string{domain, tenant, name})
+	if err := c.ApiClient.Create(ipam); err != nil {
+		return nil, err
+	}
+	return ipam, nil
 }
 
 func (c *ControllerAdapterImpl) CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, error) {
@@ -305,7 +346,7 @@ func (c *ControllerAdapterImpl) GetOrCreateInterface(net *types.VirtualNetwork, 
 }
 
 func (c *ControllerAdapterImpl) assignDefaultSecurityGroup(iface *types.VirtualMachineInterface, tenantName string) error {
-	secGroupFqName := fmt.Sprintf("%s:%s:default", DomainName, tenantName)
+	secGroupFqName := fmt.Sprintf("%s:%s:%s", DomainName, tenantName, DefaultSecurityGroup)
 	secGroup, err := types.SecurityGroupByName(c.ApiClient, secGroupFqName)
 	if err != nil || secGroup == nil {
 		return fmt.Errorf("Failed to retrieve security group %s by name: %v", secGroupFqName, err)
