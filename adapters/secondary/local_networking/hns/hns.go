@@ -97,6 +97,8 @@ func tryCreateHNSNetwork(config string) (string, error) {
 		log.Errorln(err)
 
 		errMsg := strings.ToLower(err.Error())
+		// TODO: We need a comment explaining meaning behind these error messages and why it's ok
+		// to ignore them for a bit.
 		if strings.Contains(errMsg, "hns failed") && strings.Contains(errMsg, "unspecified error") {
 			return "", &recoverableError{inner: err}
 		} else {
