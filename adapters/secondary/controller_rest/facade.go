@@ -41,6 +41,10 @@ func (c *ControllerAdapter) NewProject(domain, tenant string) (*types.Project, e
 	return c.controller.NewProject(domain, tenant)
 }
 
+func (c *ControllerAdapter) GetProject(domain, tenant string) (*types.Project, error) {
+	return c.controller.GetProject(domain, tenant)
+}
+
 func (c *ControllerAdapter) CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, error) {
 	return c.controller.CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR)
 }

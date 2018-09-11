@@ -16,11 +16,12 @@
 package controller_rest
 
 import (
+	"github.com/Juniper/contrail-go-api"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/api"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/auth"
 )
 
-func NewControllerWithKeystoneAdapter(keys *auth.KeystoneParams, ip string, port int) (*ControllerAdapter, error) {
+func NewControllerWithKeystoneAdapter(keys *auth.KeystoneParams, apiClient *contrail.Client) (*ControllerAdapter, error) {
 	auth, err := auth.NewKeystoneAuth(keys)
 	if err != nil {
 		return nil, err
@@ -31,16 +32,22 @@ func NewControllerWithKeystoneAdapter(keys *auth.KeystoneParams, ip string, port
 		return nil, err
 	}
 
-	apiClient := api.NewApiClient(ip, port)
 	apiClient.SetAuthenticator(auth)
 
 	impl := NewControllerAdapterImpl(apiClient)
 	return newControllerAdapter(impl), nil
 }
 
-func NewControllerInsecureAdapter(ip string, port int) (*ControllerAdapter, error) {
-	apiClient := api.NewApiClient(ip, port)
+func NewControllerInsecureAdapter(apiClient contrail.ApiClient) (*ControllerAdapter, error) {
 	impl := NewControllerAdapterImpl(apiClient)
+
+	// When keystone is not present only default-project is created in controller.
+	// WebUI doesn't treat like regular resource and doesn't permit some operations
+	// on it, so a regular project needs to be created.
+	_, err := impl.GetOrCreateProject(DomainName, AdminProject)
+	if err != nil {
+		return nil, err
+	}
 	return newControllerAdapter(impl), nil
 }
 

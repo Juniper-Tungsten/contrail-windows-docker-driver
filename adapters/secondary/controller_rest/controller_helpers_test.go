@@ -35,10 +35,23 @@ import (
 func NewTestClientAndProject(tenant string) (*controller_rest.ControllerAdapterImpl, *types.Project) {
 	fakeApiClient := api.NewFakeApiClient()
 	c := controller_rest.NewControllerAdapterImpl(fakeApiClient)
-
-	project, err := c.NewProject(controller_rest.DomainName, tenant)
-	Expect(err).ToNot(HaveOccurred())
+	project := NewTestProject(c, controller_rest.DomainName, tenant)
 	return c, project
+}
+
+func NewTestProject(c *controller_rest.ControllerAdapterImpl, domainName, tenantName string) *types.Project {
+	testProject, err := c.NewProject(domainName, tenantName)
+	Expect(err).ToNot(HaveOccurred())
+	return testProject
+}
+
+func CreateTestProject(c contrail.ApiClient, domainName, tenantName string) *types.Project {
+	project := new(types.Project)
+	project.SetFQName("domain", []string{domainName, tenantName})
+	err := c.Create(project)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(project).ToNot(BeNil())
+	return project
 }
 
 func CreateTestNetworkWithSubnet(c contrail.ApiClient, netName, subnetCIDR string,
@@ -65,7 +78,8 @@ func CreateTestNetwork(c contrail.ApiClient, netName string,
 
 func RemoveTestSecurityGroup(c contrail.ApiClient, groupName string,
 	project *types.Project) {
-	secGroupFqName := fmt.Sprintf("%s:%s:default", controller_rest.DomainName, tenantName)
+	secGroupFqName := fmt.Sprintf("%s:%s:%s", controller_rest.DomainName, tenantName,
+		controller_rest.DefaultSecurityGroup)
 	secGroup, err := types.SecurityGroupByName(c, secGroupFqName)
 	err = c.Delete(secGroup)
 	Expect(err).ToNot(HaveOccurred())
@@ -80,9 +94,10 @@ func AddSubnetWithDefaultGateway(c contrail.ApiClient, subnetPrefix, defaultGW s
 
 	var ipamSubnets types.VnSubnetsType
 	ipamSubnets.AddIpamSubnets(subnet)
+	ipamFqName := fmt.Sprintf("%s:%s:%s", controller_rest.DomainName, controller_rest.DefaultProject,
+		controller_rest.DefaultIPAM)
 
-	ipam, err := c.FindByName("network-ipam",
-		"default-domain:default-project:default-network-ipam")
+	ipam, err := c.FindByName("network-ipam", ipamFqName)
 	Expect(err).ToNot(HaveOccurred())
 	err = testNetwork.AddNetworkIpam(ipam.(*types.NetworkIpam), ipamSubnets)
 	Expect(err).ToNot(HaveOccurred())

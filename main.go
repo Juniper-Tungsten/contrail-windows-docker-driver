@@ -24,8 +24,10 @@ import (
 	"os/signal"
 	"strings"
 
+	contrail "github.com/Juniper/contrail-go-api"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/primary/cnm"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/api"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/auth"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hyperv_extension"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns"
@@ -88,7 +90,8 @@ func main() {
 	hypervExtension := hyperv_extension.NewHyperVvRouterForwardingExtension(vswitchName)
 	vrouter := vrouter.NewHyperVvRouter(hypervExtension)
 
-	controller, err := NewControllerAdapter(*authMethod, *controllerIP, *controllerPort, keys)
+	controllerClient := api.NewApiClient(*controllerIP, *controllerPort)
+	controller, err := NewControllerAdapter(*authMethod, controllerClient, keys)
 
 	if err != nil {
 		log.Error(err)
@@ -134,13 +137,13 @@ func waitForSigInt() {
 	log.Infoln("Good bye")
 }
 
-func NewControllerAdapter(authMethod, ip string, port int, keys *auth.KeystoneParams) (
+func NewControllerAdapter(authMethod string, apiClient *contrail.Client, keys *auth.KeystoneParams) (
 	*controller_rest.ControllerAdapter, error) {
 	switch authMethod {
 	case "keystone":
-		return controller_rest.NewControllerWithKeystoneAdapter(keys, ip, port)
+		return controller_rest.NewControllerWithKeystoneAdapter(keys, apiClient)
 	case "noauth":
-		return controller_rest.NewControllerInsecureAdapter(ip, port)
+		return controller_rest.NewControllerInsecureAdapter(apiClient)
 	default:
 		return nil, errors.New("Unsupported authentication method. Use -authMethod flag.")
 	}
