@@ -13,11 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package hns
+package hns_contrail
 
 import (
 	"errors"
 
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/core/model"
 	"github.com/Microsoft/hcsshim"
 )
@@ -36,21 +37,18 @@ type HNSContrailNetworksRepository struct {
 	associations            HNSDBNetworkAssociationMechanism
 }
 
-func NewHNSContrailNetworksRepository(physDataplaneNetAdapter string) (*HNSContrailNetworksRepository, error) {
-	if err := InitRootHNSNetwork(physDataplaneNetAdapter); err != nil {
-		return nil, err
-	}
+func NewHNSContrailNetworksRepository(physDataplaneNetAdapter string) *HNSContrailNetworksRepository {
 	return &HNSContrailNetworksRepository{
 		physDataplaneNetAdapter: physDataplaneNetAdapter,
 		associations:            HNSDBNetworkAssociationMechanism{},
-	}, nil
+	}
 }
 
 func (repo *HNSContrailNetworksRepository) CreateNetwork(dockerNetID string, network *model.Network) error {
 
 	hnsNetName := repo.associations.GenerateName(dockerNetID, network.TenantName, network.NetworkName, network.Subnet.CIDR)
 
-	net, err := GetHNSNetworkByName(hnsNetName)
+	net, err := hns.GetHNSNetworkByName(hnsNetName)
 	if net != nil {
 		return errors.New("such HNS network already exists")
 	}
@@ -69,7 +67,7 @@ func (repo *HNSContrailNetworksRepository) CreateNetwork(dockerNetID string, net
 		Subnets:            subnets,
 	}
 
-	_, err = CreateHNSNetwork(configuration)
+	_, err = hns.CreateHNSNetwork(configuration)
 	if err != nil {
 		return err
 	}
@@ -103,7 +101,7 @@ func (repo *HNSContrailNetworksRepository) DeleteNetwork(dockerNetID string) err
 	if err != nil {
 		return err
 	}
-	endpoints, err := ListHNSEndpoints()
+	endpoints, err := hns.ListHNSEndpoints()
 	if err != nil {
 		return err
 	}
@@ -113,7 +111,7 @@ func (repo *HNSContrailNetworksRepository) DeleteNetwork(dockerNetID string) err
 			return errors.New("cannot delete network with active endpoints")
 		}
 	}
-	return DeleteHNSNetwork(hnsNetwork.Id)
+	return hns.DeleteHNSNetwork(hnsNetwork.Id)
 }
 
 func (repo *HNSContrailNetworksRepository) ListNetworks() ([]model.Network, error) {
@@ -155,7 +153,7 @@ func (repo *HNSContrailNetworksRepository) findHNSNetworkByDockerID(dockerNetID 
 
 func (repo *HNSContrailNetworksRepository) listOwnedHNSNetworks() ([]hcsshim.HNSNetwork, error) {
 	var ownedHNSNetworks []hcsshim.HNSNetwork
-	hnsNetworks, err := ListHNSNetworks()
+	hnsNetworks, err := hns.ListHNSNetworks()
 	if err != nil {
 		return ownedHNSNetworks, err
 	}

@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/vmswitch"
 	"github.com/Juniper/contrail-windows-docker-driver/powershell"
 	log "github.com/sirupsen/logrus"
 )
@@ -85,7 +86,7 @@ func (hvvr *hyperVvRouterForwardingExtension) inspectExtensionProperty(property 
 func (hvvr *hyperVvRouterForwardingExtension) callOnSwitchExtension(command string, optionals ...string) (string,
 	error) {
 
-	if switchExists, err := hvvr.doesSwitchExist(); err != nil {
+	if switchExists, err := vmswitch.DoesSwitchExist(hvvr.vswitchName); err != nil {
 		return "", err
 	} else if !switchExists {
 		return "", errors.New("could not perform action on vmswitch extension, because vmswitch was not found")
@@ -99,16 +100,4 @@ func (hvvr *hyperVvRouterForwardingExtension) callOnSwitchExtension(command stri
 	}
 	stdout, _, err := powershell.CallPowershell(c...)
 	return stdout, err
-}
-
-func (hvvr *hyperVvRouterForwardingExtension) doesSwitchExist() (bool, error) {
-	c := []string{"Get-VMSwitch", "-Name", fmt.Sprintf("\"%s\"", hvvr.vswitchName)}
-	stdout, _, err := powershell.CallPowershell(c...)
-	if err != nil {
-		return false, err
-	} else if stdout == "" {
-		return false, nil
-	} else {
-		return true, nil
-	}
 }

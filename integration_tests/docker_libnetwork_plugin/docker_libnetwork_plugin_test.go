@@ -27,7 +27,7 @@ import (
 
 	"github.com/Juniper/contrail-go-api/types"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/primary/cnm"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns/win_networking"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/win_networking"
 	"github.com/Juniper/contrail-windows-docker-driver/core/ports"
 	"github.com/Juniper/contrail-windows-docker-driver/integration_tests/helpers"
 	sockets "github.com/Microsoft/go-winio"

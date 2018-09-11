@@ -13,11 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package hns
+package hns_contrail
 
 import (
 	"strings"
 
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/core/model"
 	"github.com/Microsoft/hcsshim"
 )
@@ -37,11 +38,11 @@ func (repo *HNSEndpointRepository) CreateEndpoint(name string, container *model.
 		GatewayAddress: container.Gateway,
 		MacAddress:     containerMac,
 	}
-	return CreateHNSEndpoint(configuration)
+	return hns.CreateHNSEndpoint(configuration)
 }
 
 func (repo *HNSEndpointRepository) GetEndpoint(name string) (*hcsshim.HNSEndpoint, error) {
-	return GetHNSEndpointByName(name)
+	return hns.GetHNSEndpointByName(name)
 }
 
 func (repo *HNSEndpointRepository) DeleteEndpoint(name string) error {
@@ -49,5 +50,5 @@ func (repo *HNSEndpointRepository) DeleteEndpoint(name string) error {
 	if err != nil {
 		return err
 	}
-	return DeleteHNSEndpoint(ep.Id)
+	return hns.DeleteHNSEndpoint(ep.Id)
 }

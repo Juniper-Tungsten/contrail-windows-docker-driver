@@ -21,20 +21,20 @@ import (
 	// everywhere.
 	"errors"
 
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns_contrail"
 	"github.com/Juniper/contrail-windows-docker-driver/core/model"
 	"github.com/Microsoft/hcsshim"
 )
 
 type InMemContrailNetworksRepository struct {
 	networks     map[string]hcsshim.HNSNetwork
-	associations hns.HNSDBNetworkAssociationMechanism
+	associations hns_contrail.HNSDBNetworkAssociationMechanism
 }
 
 func NewInMemContrailNetworksRepository() *InMemContrailNetworksRepository {
 	return &InMemContrailNetworksRepository{
 		networks:     make(map[string]hcsshim.HNSNetwork),
-		associations: hns.HNSDBNetworkAssociationMechanism{},
+		associations: hns_contrail.HNSDBNetworkAssociationMechanism{},
 	}
 }
 

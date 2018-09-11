@@ -16,7 +16,7 @@
 package helpers
 
 import (
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns"
 	"github.com/Microsoft/hcsshim"
 	. "github.com/onsi/gomega"
 )

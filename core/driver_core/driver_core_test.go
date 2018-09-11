@@ -28,8 +28,8 @@ import (
 
 	"github.com/Juniper/contrail-go-api/types"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
+	netSim "github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns_contrail/simulator"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hyperv_extension"
-	netSim "github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/simulator"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/port_association/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/core/driver_core"
 	"github.com/Juniper/contrail-windows-docker-driver/core/ports"

@@ -20,7 +20,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns/win_networking/retry"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/win_networking/retry"
 )
 
 const (

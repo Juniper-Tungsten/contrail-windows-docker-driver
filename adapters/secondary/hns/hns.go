@@ -20,16 +20,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns/win_networking"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/win_networking"
 	"github.com/Microsoft/hcsshim"
 	log "github.com/sirupsen/logrus"
 )
 
 const (
-	// rootNetworkName is a name of root HNS network created solely for the purpose of
-	// having a virtual switch
-	rootNetworkName = "ContrailRootNetwork"
-
 	// createHNSNetworkInitialRetryDelay is a delay between consecutive attemps
 	// to create HNSNetwork. After each retry, the delay is increased to
 	// give HNS more time to cool down.
@@ -50,45 +46,6 @@ type recoverableError struct {
 
 func (e *recoverableError) Error() string {
 	return e.inner.Error()
-}
-
-func InitRootHNSNetwork(nameOfAdapterToUse string) error {
-	// HNS automatically creates a new vswitch if the first HNS network is created. We want to
-	// control this behaviour. That's why we create a dummy root HNS network.
-
-	rootNetwork, err := GetHNSNetworkByName(rootNetworkName)
-	if err != nil {
-		return err
-	}
-	if rootNetwork == nil {
-
-		subnets := []hcsshim.Subnet{
-			{
-				AddressPrefix: "0.0.0.0/24",
-			},
-		}
-		configuration := &hcsshim.HNSNetwork{
-			Name:               rootNetworkName,
-			Type:               "transparent",
-			NetworkAdapterName: nameOfAdapterToUse,
-			Subnets:            subnets,
-		}
-		// Before we CreateHNSNetwork we need to make sure, that interface we want to attach the vmswitch
-		// to has correct IP address. Otherwise, HNS will complain. The interface exists only, if root HNS
-		// network doesn't yet exist. It disappears the moment vmswitch is created.
-		if err := win_networking.WaitForValidIPReacquisition(nameOfAdapterToUse); err != nil {
-			return err
-		}
-		rootNetID, err := CreateHNSNetwork(configuration)
-		if err != nil {
-			return err
-		}
-
-		log.Infoln("Created root HNS network:", rootNetID)
-	} else {
-		log.Infoln("Existing root HNS network found:", rootNetwork.Id)
-	}
-	return nil
 }
 
 func tryCreateHNSNetwork(config string) (string, error) {

@@ -27,8 +27,9 @@ import (
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/primary/cnm"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/api"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns_contrail"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hyperv_extension"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/vmswitch"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/port_association/agent"
 	"github.com/Juniper/contrail-windows-docker-driver/configuration"
 	"github.com/Juniper/contrail-windows-docker-driver/core/driver_core"
@@ -98,6 +99,9 @@ func loadConfig(cfgFilePath string) (*configuration.Configuration, error) {
 }
 
 func run(cfg *configuration.Configuration) error {
+	if err := vmswitch.EnsureSwitchExists(cfg.Driver.VSwitchName, cfg.Driver.Adapter); err != nil {
+		return err
+	}
 	hypervExtension := hyperv_extension.NewHyperVvRouterForwardingExtension(cfg.Driver.VSwitchName)
 	vrouter := vrouter.NewHyperVvRouter(hypervExtension)
 
@@ -113,12 +117,9 @@ func run(cfg *configuration.Configuration) error {
 
 	agent := agent.NewAgentRestAPI(http.DefaultClient, agentUrl)
 
-	netRepo, err := hns.NewHNSContrailNetworksRepository(cfg.Driver.Adapter)
-	if err != nil {
-		return err
-	}
+	netRepo := hns_contrail.NewHNSContrailNetworksRepository(cfg.Driver.Adapter)
 
-	epRepo := &hns.HNSEndpointRepository{}
+	epRepo := &hns_contrail.HNSEndpointRepository{}
 
 	core, err := driver_core.NewContrailDriverCore(vrouter, controller, agent, netRepo, epRepo)
 	if err != nil {
@@ -151,6 +152,6 @@ func NewControllerAdapter(cfg *configuration.Configuration) (
 	case "noauth":
 		return controller_rest.NewControllerInsecureAdapter(apiClient)
 	default:
-		return nil, errors.New("Unsupported authentication method. Use -authMethod flag.")
+		return nil, errors.New("unsupported authentication method, use -authMethod flag")
 	}
 }

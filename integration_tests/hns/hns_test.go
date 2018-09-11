@@ -26,8 +26,9 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns"
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/hns/win_networking"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns_contrail"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/win_networking"
 	"github.com/Juniper/contrail-windows-docker-driver/core/model"
 	"github.com/Juniper/contrail-windows-docker-driver/integration_tests/helpers"
 	"github.com/Microsoft/hcsshim"
@@ -96,10 +97,10 @@ var _ = PDescribe("HNSContrailNetworksRepository", func() {
 		Subnet:      subnet,
 	}
 
-	var hnsContrailRepo *hns.HNSContrailNetworksRepository
+	var hnsContrailRepo *hns_contrail.HNSContrailNetworksRepository
 
 	BeforeEach(func() {
-		hnsContrailRepo = &hns.HNSContrailNetworksRepository{}
+		hnsContrailRepo = &hns_contrail.HNSContrailNetworksRepository{}
 	})
 
 	AfterEach(func() {
