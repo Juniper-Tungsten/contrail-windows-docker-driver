@@ -22,20 +22,28 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Juniper/contrail-windows-docker-driver/logging"
 	"github.com/docker/go-plugins-helpers/network"
 	"github.com/docker/libnetwork/netlabel"
 	log "github.com/sirupsen/logrus"
 )
 
+const (
+	loggerRequestPrepend  = "[CNM-REQUEST]"
+	loggerResponsePrepend = "[CNM-RESPONSE]"
+)
+
 func (d *ServerCNM) GetCapabilities() (*network.CapabilitiesResponse, error) {
-	log.Debugln("Received GetCapabilities request from docker daemon")
+	log.Debugln(loggerRequestPrepend, "GetCapabilities", "No request parameters")
 	r := &network.CapabilitiesResponse{}
 	r.Scope = network.LocalScope
+	log.Debugln(loggerResponsePrepend, "GetCapabilities", logging.VariableToJSON(r))
 	return r, nil
 }
 
 func (d *ServerCNM) CreateNetwork(req *network.CreateNetworkRequest) error {
-	log.Debugln("Received CreateNetwork request from docker daemon:", req)
+
+	log.Debugln(loggerRequestPrepend, "CreateNetwork", logging.VariableToJSON(req))
 
 	reqGenericOptionsMap, exists := req.Options[netlabel.GenericData]
 	if !exists {
@@ -71,27 +79,27 @@ func (d *ServerCNM) CreateNetwork(req *network.CreateNetworkRequest) error {
 
 func (d *ServerCNM) AllocateNetwork(req *network.AllocateNetworkRequest) (
 	*network.AllocateNetworkResponse, error) {
-	log.Debugln("Received AllocateNetwork request from docker daemon:", req)
+	log.Debugln(loggerRequestPrepend, "AllocateNetwork", logging.VariableToJSON(req))
 	// This method is used in swarm, in remote plugins. We don't implement it.
+	// If implemented log response with:
+	// log.Debugln(loggerResponsePrepend, "AllocateNetwork", logging.GetJSON(response))
 	return nil, errors.New("AllocateNetwork is not implemented")
 }
 
 func (d *ServerCNM) DeleteNetwork(req *network.DeleteNetworkRequest) error {
-	log.Debugln("Received DeleteNetwork request from docker daemon:", req)
-
+	log.Debugln(loggerRequestPrepend, "DeleteNetwork", logging.VariableToJSON(req))
 	return d.Core.DeleteNetwork(req.NetworkID)
 }
 
 func (d *ServerCNM) FreeNetwork(req *network.FreeNetworkRequest) error {
-	log.Debugln("Received FreeNetwork request from docker daemon:", req)
-
+	log.Debugln(loggerRequestPrepend, "FreeNetwork", logging.VariableToJSON(req))
 	// This method is used in swarm, in remote plugins. We don't implement it.
 	return errors.New("FreeNetwork is not implemented")
 }
 
 func (d *ServerCNM) CreateEndpoint(req *network.CreateEndpointRequest) (
 	*network.CreateEndpointResponse, error) {
-	log.Debugln("Received CreateEndpoint request from docker daemon:", req)
+	log.Debugln(loggerRequestPrepend, "CreateEndpoint", logging.VariableToJSON(req))
 
 	container, err := d.Core.CreateEndpoint(req.NetworkID, req.EndpointID)
 	if err != nil {
@@ -105,17 +113,19 @@ func (d *ServerCNM) CreateEndpoint(req *network.CreateEndpointRequest) (
 			MacAddress: container.Mac,
 		},
 	}
+
+	log.Debugln(loggerResponsePrepend, "CreateEndpoint", logging.VariableToJSON(r))
 	return r, nil
 }
 
 func (d *ServerCNM) DeleteEndpoint(req *network.DeleteEndpointRequest) error {
-	log.Debugln("Received DeleteEndpoint request from docker daemon:", req)
+	log.Debugln(loggerRequestPrepend, "DeleteEndpoint", logging.VariableToJSON(req))
 
 	return d.Core.DeleteEndpoint(req.NetworkID, req.EndpointID)
 }
 
 func (d *ServerCNM) EndpointInfo(req *network.InfoRequest) (*network.InfoResponse, error) {
-	log.Debugln("Received EndpointInfo request from docker daemon:", req)
+	log.Debugln(loggerRequestPrepend, "EndpointInfo", logging.VariableToJSON(req))
 
 	hnsEpName := req.EndpointID
 	hnsEp, err := d.Core.LocalContrailEndpointsRepo.GetEndpoint(hnsEpName)
@@ -134,11 +144,12 @@ func (d *ServerCNM) EndpointInfo(req *network.InfoRequest) (*network.InfoRespons
 	r := &network.InfoResponse{
 		Value: respData,
 	}
+	log.Debugln(loggerResponsePrepend, "EndpointInfo", logging.VariableToJSON(r))
 	return r, nil
 }
 
 func (d *ServerCNM) Join(req *network.JoinRequest) (*network.JoinResponse, error) {
-	log.Debugln("Received Join request from docker daemon:", req)
+	log.Debugln(loggerRequestPrepend, "Join", logging.VariableToJSON(req))
 
 	hnsEp, err := d.Core.LocalContrailEndpointsRepo.GetEndpoint(req.EndpointID)
 	if err != nil {
@@ -153,11 +164,12 @@ func (d *ServerCNM) Join(req *network.JoinRequest) (*network.JoinResponse, error
 		Gateway:               hnsEp.GatewayAddress,
 	}
 
+	log.Debugln(loggerResponsePrepend, "Join", logging.VariableToJSON(r))
 	return r, nil
 }
 
 func (d *ServerCNM) Leave(req *network.LeaveRequest) error {
-	log.Debugln("Received Leave request from docker daemon:", req)
+	log.Debugln(loggerRequestPrepend, "Leave", logging.VariableToJSON(req))
 
 	hnsEp, err := d.Core.LocalContrailEndpointsRepo.GetEndpoint(req.EndpointID)
 	if err != nil {
@@ -171,25 +183,25 @@ func (d *ServerCNM) Leave(req *network.LeaveRequest) error {
 }
 
 func (d *ServerCNM) DiscoverNew(req *network.DiscoveryNotification) error {
-	log.Debugln("Received DiscoverNew request from docker daemon:", req)
+	log.Debugln(loggerRequestPrepend, "DiscoverNew", "IGNORED", logging.VariableToJSON(req))
 	// We don't care about discovery notifications.
 	return nil
 }
 
 func (d *ServerCNM) DiscoverDelete(req *network.DiscoveryNotification) error {
-	log.Debugln("Received DiscoverDelete request from docker daemon:", req)
+	log.Debugln(loggerRequestPrepend, "DiscoverDelete", "IGNORED", logging.VariableToJSON(req))
 	// We don't care about discovery notifications.
 	return nil
 }
 
 func (d *ServerCNM) ProgramExternalConnectivity(
 	req *network.ProgramExternalConnectivityRequest) error {
-	log.Debugln("Received ProgramExternalConnectivity request from docker daemon:", req)
+	log.Debugln(loggerRequestPrepend, "ProgramExternalConnectivity", "IGNORED", logging.VariableToJSON(req))
 	return nil
 }
 
 func (d *ServerCNM) RevokeExternalConnectivity(
 	req *network.RevokeExternalConnectivityRequest) error {
-	log.Debugln("Received RevokeExternalConnectivity request from docker daemon:", req)
+	log.Debugln(loggerRequestPrepend, "RevokeExternalConnectivity", "IGNORED", logging.VariableToJSON(req))
 	return nil
 }

@@ -16,6 +16,7 @@
 package logging
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -52,4 +53,15 @@ func SetupHook(logPath, logLevelString string) (*LogToFileHook, error) {
 func DefaultLogFilepath() string {
 	return string(filepath.Join(os.Getenv("ProgramData"),
 		"Contrail", "var", "log", "contrail", "contrail-windows-docker-driver.log"))
+}
+
+// Function doesn't return error, because it is just for logging.
+// If conversion to json returns error we want to log variable as raw
+func VariableToJSON(variable interface{}) string {
+	jsonOutput, err := json.Marshal(variable)
+	if err != nil {
+		log.Debugln("Converting to JSON error:", err)
+		return fmt.Sprintf("Cannot convert request to JSON. Raw output: %s", variable)
+	}
+	return string(jsonOutput)
 }
