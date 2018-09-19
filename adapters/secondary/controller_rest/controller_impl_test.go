@@ -521,14 +521,13 @@ var _ = Describe("ControllerAdapterImpl", func() {
 
 	Describe("getting Contrail instance IP", func() {
 		var testNetwork *types.VirtualNetwork
-		var testInstance *types.VirtualMachine
 		var testInterface *types.VirtualMachineInterface
 		BeforeEach(func() {
 			testNetwork = CreateTestNetworkWithSubnet(client.ApiClient, networkName, subnetCIDR,
 				project)
 			testInterface = CreateMockedInterface(client.ApiClient, testNetwork, tenantName,
 				containerID)
-			testInstance = CreateTestInstance(client.ApiClient, testInterface, containerID)
+			_ = CreateTestInstance(client.ApiClient, testInterface, containerID)
 		})
 		Context("when instance IP already exists in Contrail", func() {
 			var testInstanceIP *types.InstanceIp

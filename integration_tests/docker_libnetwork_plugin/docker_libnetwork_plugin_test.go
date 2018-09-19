@@ -66,14 +66,11 @@ func TestDockerPlugin(t *testing.T) {
 
 // NOTE: these tests were not ran in quite a while... sorry.
 var _ = Describe("Contrail Docker Libnetwork Plugin registering and listening", func() {
-	var fakeVRouter ports.VRouter
 	var contrailController ports.Controller
 	var server *cnm.ServerCNM
-	var localContrailNetworksRepo ports.LocalContrailNetworkRepository
-	var project *types.Project
 
 	BeforeEach(func() {
-		fakeVRouter, server, contrailController, localContrailNetworksRepo, project = helpers.NewIntegrationModulesUnderTest()
+		_, server, contrailController, _, _ = helpers.NewIntegrationModulesUnderTest()
 	})
 	AfterEach(func() {
 		if server.IsServing {

@@ -63,16 +63,16 @@ func (c *ControllerAdapterImpl) NewProject(domain, tenant string) (*types.Projec
 	secGroup, err := c.createSecurityGroup(domain, tenant, DefaultSecurityGroup)
 	if err != nil {
 		if warn := c.ApiClient.Delete(project); warn != nil {
-			log.Warnln("Failed to delete project %s after failed default security group creation: %v", tenant, warn)
+			log.Warnf("Failed to delete project %s after failed default security group creation: %v", tenant, warn)
 		}
 		return nil, err
 	}
 	if _, err := c.createNetworkIPAM(domain, tenant, DefaultIPAM); err != nil {
 		if warn := c.ApiClient.Delete(secGroup); warn != nil {
-			log.Warnln("Failed to delete default security group after failed default IPAM creation: %v", warn)
+			log.Warnf("Failed to delete default security group after failed default IPAM creation: %v", warn)
 		}
 		if warn := c.ApiClient.Delete(project); warn != nil {
-			log.Warnln("Failed to delete project %s after failed default IPAM creation: %v", tenant, warn)
+			log.Warnf("Failed to delete project %s after failed default IPAM creation: %v", tenant, warn)
 		}
 		return nil, err
 	}
