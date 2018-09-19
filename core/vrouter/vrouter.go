@@ -76,7 +76,9 @@ func (vr *HyperVvRouter) assertRunning() error {
 		return err
 	} else if !actuallyRunning {
 		return errors.New("Extension is stopped, when it should be running - " +
-			"possible fix involves reinstallation of the vRouter Forwarding Extension")
+			"possible fix involves reboot, disabling/enabling or even reinstallation of the " +
+			"vRouter Forwarding Extension. Try using Remove-ContainerNetwork to clear " +
+			"HNS state along with any VMSwitches.")
 	} else {
 		return nil
 	}
