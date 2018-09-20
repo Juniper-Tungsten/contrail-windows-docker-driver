@@ -22,6 +22,9 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/Juniper/contrail-windows-docker-driver/logging"
+	log "github.com/sirupsen/logrus"
 )
 
 // It should be equal to PortSubscribeEntry::Type defined in Contrail Vrouter Agent
@@ -29,6 +32,10 @@ const (
 	vmPortType     = 0
 	nameSpaceType  = 1
 	remotePortType = 2
+)
+
+const (
+	loggerPackageTag = "VROUTER-AGENT"
 )
 
 type PortRequestMsg struct {
@@ -57,7 +64,9 @@ func NewAgentRestAPI(httpClient *http.Client, url *url.URL) *agentRestAPI {
 }
 
 func (agent *agentRestAPI) sendRequest(request *http.Request) error {
+	log.Debugln(logging.HTTPMessage(loggerPackageTag, request))
 	response, err := agent.httpClient.Do(request)
+	log.Debugln(logging.HTTPMessage(loggerPackageTag, response))
 	if err != nil {
 		return err
 	}
