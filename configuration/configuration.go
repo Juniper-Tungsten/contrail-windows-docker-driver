@@ -16,6 +16,11 @@
 package configuration
 
 import (
+	"os"
+	"path/filepath"
+
+	"github.com/Juniper/contrail-windows-docker-driver/logging"
+
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest/auth"
 )
 
@@ -32,9 +37,15 @@ type AuthConf struct {
 	Keystone   auth.KeystoneParams
 }
 
+type LoggingConf struct {
+	LogPath  string
+	LogLevel string
+}
+
 type Configuration struct {
-	Driver DriverConf
-	Auth   AuthConf
+	Driver  DriverConf
+	Auth    AuthConf
+	Logging LoggingConf
 }
 
 func NewDefaultConfiguration() (conf Configuration) {
@@ -42,7 +53,10 @@ func NewDefaultConfiguration() (conf Configuration) {
 	conf.Driver.ControllerIP = "192.168.0.10"
 	conf.Driver.ControllerPort = 8082
 	conf.Driver.AgentURL = "http://127.0.0.1:9091"
-	conf.Driver.VSwitchName = "Layered <adapter>"
+	conf.Driver.VSwitchName = "Layered?<adapter>"
+
+	conf.Logging.LogPath = logging.DefaultLogFilepath()
+	conf.Logging.LogLevel = "Debug"
 
 	conf.Auth.AuthMethod = "noauth"
 
@@ -56,10 +70,5 @@ func NewDefaultConfiguration() (conf Configuration) {
 }
 
 func DefaultConfigFilepath() string {
-	return ""
-	// TODO: uncomment the following lines once templating logic is implemented in ansible.
-	//       For now, return empty string, so that docker driver defaults to reading only command
-	//       line parameters.
-	// return string(filepath.Join(os.Getenv("ProgramData"),
-	// 	"Contrail", "etc", "contrail", "cnm-driver.conf"))
+	return string(filepath.Join(os.Getenv("ProgramData"), "Contrail", "etc", "contrail", "contrail-cnm-plugin.conf"))
 }

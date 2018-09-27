@@ -62,7 +62,7 @@ func SetupHook(logPath, logLevelString string) (*LogToFileHook, error) {
 
 func DefaultLogFilepath() string {
 	return string(filepath.Join(os.Getenv("ProgramData"),
-		"Contrail", "var", "log", "contrail", "contrail-windows-docker-driver.log"))
+		"Contrail", "var", "log", "contrail", "contrail-cnm-plugin.log"))
 }
 
 // Function doesn't return error, because it is just for logging.

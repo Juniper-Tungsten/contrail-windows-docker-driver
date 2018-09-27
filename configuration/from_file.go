@@ -19,6 +19,7 @@ import (
 	"github.com/go-ini/ini"
 )
 
+// Method used for simpler testing
 func (conf *Configuration) LoadFromString(data string) error {
 	iniCfg, err := ini.Load([]byte(data))
 	if err != nil {
@@ -39,6 +40,11 @@ func (conf *Configuration) LoadFromFile(filepath string) error {
 
 func (conf *Configuration) mapIni(cfg *ini.File) error {
 	err := cfg.Section("DRIVER").MapTo(&conf.Driver)
+	if err != nil {
+		return err
+	}
+
+	err = cfg.Section("LOGGING").MapTo(&conf.Logging)
 	if err != nil {
 		return err
 	}

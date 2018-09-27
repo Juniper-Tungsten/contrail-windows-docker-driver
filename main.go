@@ -39,37 +39,44 @@ import (
 )
 
 var (
-	logPath = flag.String("logPath", logging.DefaultLogFilepath(),
-		"Path to log file.")
-	logLevelString = flag.String("logLevel", "Info",
-		"Log verbosity (possible values: Debug|Info|Warn|Error|Fatal|Panic)")
 	configPath = flag.String("config", configuration.DefaultConfigFilepath(),
-		"Path to configuration file. See cnm-driver.conf.sample for an example.")
-	dryRun = flag.Bool("dryRun", false,
+		"Path to configuration file. See contrail-cnm-plugin.conf.sample for an example.")
+	testConfig = flag.Bool("testConfig", false,
 		"Loads configuration but doesn't run anything. Useful for testing if config file syntax "+
 			"is correct.")
 )
 
+// Temp, not to have conflict on merging with CI and COD
+// which still use those flags. Will be removed.
+var (
+	logPath        = flag.String("logPath", "", "")
+	logLevelString = flag.String("logLevel", "", "")
+)
+
 func init() {
 	flag.Parse()
+	// Set to log every message on Stdout
+	// It will be changed after reading config
+	log.SetLevel(log.DebugLevel)
+	log.SetOutput(os.Stdout)
 }
 
 func main() {
-	logHook, err := logging.SetupHook(*logPath, *logLevelString)
+	cfg, err := loadConfig(*configPath)
+	if err != nil {
+		log.Errorln("Loading config failed:", err)
+		os.Exit(2)
+	}
+
+	logHook, err := logging.SetupHook(cfg.Logging.LogPath, cfg.Logging.LogLevel)
 	if err != nil {
 		log.Errorf("Setting up logging failed: %s", err)
 		os.Exit(1)
 	}
 	defer logHook.Close()
 
-	cfg, err := loadConfig(*configPath)
-	if err != nil {
-		log.Errorln("Loading config failed:")
-		os.Exit(2)
-	}
-
-	if *dryRun {
-		log.Info("Dry run - exiting.")
+	if *testConfig {
+		log.Info("Config is ok - exiting.")
 		os.Exit(0)
 	}
 
@@ -87,8 +94,6 @@ func loadConfig(cfgFilePath string) (*configuration.Configuration, error) {
 		if err != nil {
 			return nil, err
 		}
-	} else {
-		cfg.LoadFromCommandLine()
 	}
 
 	cfg.Driver.VSwitchName = strings.Replace(cfg.Driver.VSwitchName, "<adapter>",

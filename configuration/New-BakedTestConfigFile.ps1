@@ -18,7 +18,7 @@
 # We bake sample configuration file into the compiled test binary, so that we don't have to
 # transfer the file separately to remote machine to invoke integration tests that use it.
 
-$CfgFile = Get-Content -Raw ../cnm-driver.conf.sample
+$CfgFile = Get-Content -Raw ../contrail-cnm-plugin.conf.sample
 
 "
 package configuration_test

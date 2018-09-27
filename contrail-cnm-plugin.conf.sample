@@ -19,6 +19,12 @@ AgentURL = http://127.0.0.1:9091
 # on your version of OS.
 VSwitchName = Layered?<adapter>
 
+[LOGGING]
+# Path to log file. Leave empty for default
+LogPath = 
+
+# Log verbosity (possible values: Debug|Info|Warn|Error|Fatal|Panic)")
+LogLevel = Debug
 
 [AUTH]
 # Auth method. Available values: (keystone|noauth). If keystone. [KEYSTONE] section must be filled.
