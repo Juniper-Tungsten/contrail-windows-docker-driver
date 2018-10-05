@@ -46,19 +46,8 @@ var (
 			"is correct.")
 )
 
-// Temp, not to have conflict on merging with CI and COD
-// which still use those flags. Will be removed.
-var (
-	logPath        = flag.String("logPath", "", "")
-	logLevelString = flag.String("logLevel", "", "")
-)
-
 func init() {
 	flag.Parse()
-	// Set to log every message on Stdout
-	// It will be changed after reading config
-	log.SetLevel(log.DebugLevel)
-	log.SetOutput(os.Stdout)
 }
 
 func main() {
@@ -68,12 +57,12 @@ func main() {
 		os.Exit(2)
 	}
 
-	logHook, err := logging.SetupHook(cfg.Logging.LogPath, cfg.Logging.LogLevel)
+	logFile, err := logging.SetupLog(cfg.Logging.LogPath, cfg.Logging.LogLevel)
 	if err != nil {
 		log.Errorf("Setting up logging failed: %s", err)
 		os.Exit(1)
 	}
-	defer logHook.Close()
+	defer logFile.Close()
 
 	if *testConfig {
 		log.Info("Config is ok - exiting.")

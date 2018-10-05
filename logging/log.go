@@ -34,7 +34,15 @@ const (
 	EmptyHTTPBody               = "Body is empty."
 )
 
-func SetupHook(logPath, logLevelString string) (*LogToFileHook, error) {
+func init() {
+	log.SetFormatter(&log.TextFormatter{FullTimestamp: true})
+	// Set to log every message on Stdout
+	// It will be changed after reading config
+	log.SetLevel(log.DebugLevel)
+	log.SetOutput(os.Stdout)
+}
+
+func SetupLog(logPath string, logLevelString string) (*os.File, error) {
 	logLevel, err := log.ParseLevel(logLevelString)
 	if err != nil {
 		log.Error(err)
@@ -42,10 +50,9 @@ func SetupHook(logPath, logLevelString string) (*LogToFileHook, error) {
 	}
 	log.SetLevel(logLevel)
 
-	log.Debugln("Logging to", filepath.Dir(logPath))
+	log.Debugln("Logging to dir:", filepath.Dir(logPath))
 
-	err = os.MkdirAll(filepath.Dir(logPath), 0755)
-	if err != nil {
+	if err = os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
 		return nil, fmt.Errorf("When trying to create log dir %s", err)
 	}
 
@@ -54,10 +61,9 @@ func SetupHook(logPath, logLevelString string) (*LogToFileHook, error) {
 		return nil, fmt.Errorf("When trying to open log file: %s", err)
 	}
 
-	fileLoggerHook := NewLogToFileHook(logFile)
-	log.AddHook(fileLoggerHook)
+	log.SetOutput(logFile)
 
-	return fileLoggerHook, nil
+	return logFile, nil
 }
 
 func DefaultLogFilepath() string {

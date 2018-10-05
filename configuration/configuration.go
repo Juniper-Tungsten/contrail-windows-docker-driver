@@ -56,7 +56,7 @@ func NewDefaultConfiguration() (conf Configuration) {
 	conf.Driver.VSwitchName = "Layered?<adapter>"
 
 	conf.Logging.LogPath = logging.DefaultLogFilepath()
-	conf.Logging.LogLevel = "Debug"
+	conf.Logging.LogLevel = "Info"
 
 	conf.Auth.AuthMethod = "noauth"
 
@@ -70,5 +70,6 @@ func NewDefaultConfiguration() (conf Configuration) {
 }
 
 func DefaultConfigFilepath() string {
-	return string(filepath.Join(os.Getenv("ProgramData"), "Contrail", "etc", "contrail", "contrail-cnm-plugin.conf"))
+	return string(filepath.Join(os.Getenv("ProgramData"),
+		"Contrail", "etc", "contrail", "contrail-cnm-plugin.conf"))
 }
