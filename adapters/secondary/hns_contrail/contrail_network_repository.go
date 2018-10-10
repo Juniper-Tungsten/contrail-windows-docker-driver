@@ -17,6 +17,7 @@ package hns_contrail
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/core/model"
@@ -65,6 +66,7 @@ func (repo *HNSContrailNetworksRepository) CreateNetwork(dockerNetID string, net
 		Type:               "transparent",
 		NetworkAdapterName: string(repo.physDataplaneNetAdapter),
 		Subnets:            subnets,
+		DNSServerList:      strings.Join(network.Subnet.DNSServerList, ","),
 	}
 
 	_, err = hns.CreateHNSNetwork(configuration)
@@ -85,7 +87,8 @@ func (repo *HNSContrailNetworksRepository) GetNetwork(dockerNetID string) (*mode
 		repo.associations.SplitName(hnsNetwork.Name)
 
 	Subnet := model.Subnet{
-		CIDR: foundSubnetCIDR,
+		CIDR:          foundSubnetCIDR,
+		DNSServerList: strings.Split(hnsNetwork.DNSServerList, ","),
 	}
 	Net := model.Network{
 		LocalID:     hnsNetwork.Id,
@@ -124,7 +127,8 @@ func (repo *HNSContrailNetworksRepository) ListNetworks() ([]model.Network, erro
 		_, foundTenantName, foundNetworkName, foundSubnetCIDR :=
 			repo.associations.SplitName(hnsNetwork.Name)
 		Subnet := model.Subnet{
-			CIDR: foundSubnetCIDR,
+			CIDR:          foundSubnetCIDR,
+			DNSServerList: strings.Split(hnsNetwork.DNSServerList, ","),
 		}
 		net := model.Network{
 			LocalID:     hnsNetwork.Id,

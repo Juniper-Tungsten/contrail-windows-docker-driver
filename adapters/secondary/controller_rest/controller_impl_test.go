@@ -42,9 +42,11 @@ const (
 	subnetPrefix = "10.10.10.0"
 	subnetMask   = 24
 	defaultGW    = "10.10.10.1"
+	dnsServer    = "10.10.10.2"
 	ifaceMac     = "contrail_pls_check_macs"
 	containerID  = "12345678901"
 	testTenant   = "tereska"
+	ipamName     = "ulka"
 )
 
 func init() {
@@ -558,6 +560,105 @@ var _ = Describe("ControllerAdapterImpl", func() {
 				existingIP, err := types.InstanceIpByUuid(client.ApiClient, instanceIP.GetUuid())
 				Expect(err).ToNot(HaveOccurred())
 				Expect(existingIP.GetUuid()).To(Equal(instanceIP.GetUuid()))
+			})
+		})
+	})
+	Describe("getting DNS addresses", func() {
+		var testNetwork *types.VirtualNetwork
+		var testIpam *types.NetworkIpam
+		var testSubnet *types.IpamSubnetType
+		var enableDHCP bool
+		BeforeEach(func() {
+			testNetwork = CreateTestNetwork(client.ApiClient, networkName, project)
+		})
+		Context("when DHCP is enabled in subnet", func() {
+			BeforeEach(func() {
+				enableDHCP = true
+			})
+			Context("when IpamDnsMethod is not defined", func() {
+				BeforeEach(func() {
+					testIpam = CreateTestIPAMWithDNS(client.ApiClient, project, ipamName, "")
+					testSubnet = AddSubnetToNetwork(client.ApiClient, testNetwork, testIpam, subnetPrefix, defaultGW,
+						dnsServer, subnetMask, enableDHCP)
+				})
+				It("returns empty list", func() {
+					dnsList, _ := client.GetDNSAddresses(testNetwork, testSubnet)
+					Expect(dnsList).To(BeEmpty())
+				})
+				It("shows error", func() {
+					_, err := client.GetDNSAddresses(testNetwork, testSubnet)
+					Expect(err).To(HaveOccurred())
+				})
+			})
+			Context("when IpamDnsMethod equals default-dns-server", func() {
+				BeforeEach(func() {
+					testIpam = CreateTestIPAMWithDNS(client.ApiClient, project, ipamName, "default-dns-server")
+					testSubnet = AddSubnetToNetwork(client.ApiClient, testNetwork, testIpam, subnetPrefix, defaultGW,
+						dnsServer, subnetMask, enableDHCP)
+				})
+				It("returns list with default gateway as only element", func() {
+					dnsList, err := client.GetDNSAddresses(testNetwork, testSubnet)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(len(dnsList)).To(Equal(1))
+					Expect(dnsList[0]).To(Equal(testSubnet.DefaultGateway))
+				})
+			})
+			Context("when IpamDnsMethod equals virtual-dns-server", func() {
+				BeforeEach(func() {
+					testIpam = CreateTestIPAMWithDNS(client.ApiClient, project, ipamName, "virtual-dns-server")
+					testSubnet = AddSubnetToNetwork(client.ApiClient, testNetwork, testIpam, subnetPrefix, defaultGW,
+						dnsServer, subnetMask, enableDHCP)
+				})
+				It("returns list with dns server address defined in subnet as only element", func() {
+					dnsList, err := client.GetDNSAddresses(testNetwork, testSubnet)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(len(dnsList)).To(Equal(1))
+					Expect(dnsList[0]).To(Equal(testSubnet.DnsServerAddress))
+				})
+			})
+			Context("when IpamDnsMethod equals none", func() {
+				BeforeEach(func() {
+					testIpam = CreateTestIPAMWithDNS(client.ApiClient, project, ipamName, "none")
+					testSubnet = AddSubnetToNetwork(client.ApiClient, testNetwork, testIpam, subnetPrefix, defaultGW,
+						dnsServer, subnetMask, enableDHCP)
+				})
+				It("returns empty list", func() {
+					dnsList, err := client.GetDNSAddresses(testNetwork, testSubnet)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(dnsList).To(BeEmpty())
+				})
+			})
+			Context("when IpamDnsMethod equals tenant-dns-server", func() {
+				BeforeEach(func() {
+					testIpam = CreateTestIPAMWithDNS(client.ApiClient, project, ipamName, "tenant-dns-server")
+					testSubnet = AddSubnetToNetwork(client.ApiClient, testNetwork, testIpam, subnetPrefix, defaultGW,
+						dnsServer, subnetMask, enableDHCP)
+				})
+				Context("when tenant dns addresses list is not defined", func() {
+					It("doesn't throw an error", func() {
+						dnsList, err := client.GetDNSAddresses(testNetwork, testSubnet)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(dnsList).To(BeEmpty())
+					})
+				})
+				Context("when tenant dns addresses list is filled", func() {
+					var givenDnsList []string
+
+					const (
+						addr1 = "192.168.0.2"
+						addr2 = "192.168.0.3"
+					)
+
+					BeforeEach(func() {
+						givenDnsList = []string{addr1, addr2}
+						AddTenantDNSAddresses(client.ApiClient, testIpam, givenDnsList)
+					})
+					It("returns tenant DNS addresses defined in Network Ipam", func() {
+						dnsList, err := client.GetDNSAddresses(testNetwork, testSubnet)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(dnsList).To(ConsistOf(givenDnsList))
+					})
+				})
 			})
 		})
 	})

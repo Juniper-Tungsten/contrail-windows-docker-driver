@@ -59,9 +59,15 @@ func (c *ControllerAdapter) GetNetworkWithSubnet(tenantName, networkName, subnet
 		return nil, err
 	}
 
+	dnsList, err := c.controller.GetDNSAddresses(network, ipamSubnet)
+	if err != nil {
+		log.Warnln(err)
+	}
+
 	subnet := model.Subnet{
-		CIDR:      c.controller.getCidrFromIpamSubnet(ipamSubnet),
-		DefaultGW: ipamSubnet.DefaultGateway,
+		CIDR:          c.controller.getCidrFromIpamSubnet(ipamSubnet),
+		DefaultGW:     ipamSubnet.DefaultGateway,
+		DNSServerList: dnsList,
 	}
 
 	net := &model.Network{

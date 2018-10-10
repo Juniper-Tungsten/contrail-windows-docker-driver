@@ -45,6 +45,7 @@ type LocalEndpoint struct {
 }
 
 type Subnet struct {
-	DefaultGW string
-	CIDR      string
+	DefaultGW     string
+	CIDR          string
+	DNSServerList []string
 }
