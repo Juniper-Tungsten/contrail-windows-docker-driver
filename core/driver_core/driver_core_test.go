@@ -48,6 +48,7 @@ const (
 	subnetCIDR        = "1.2.3.0/24"
 	dockerNetID       = "1234dnID"
 	endpointID        = "5678epID"
+	endpointIP        = "1.2.3.10"
 )
 
 func TestCore(t *testing.T) {
@@ -189,7 +190,7 @@ var _ = Describe("Core tests", func() {
 			// DeleteEndpoint request.
 			BeforeEach(func() {
 				setupControllerNetworkAndLocalNetwork()
-				_, err := testedCore.CreateEndpoint(dockerNetID, endpointID)
+				_, err := testedCore.CreateEndpoint(dockerNetID, endpointID, nil)
 				Expect(err).ToNot(HaveOccurred())
 			})
 			It("returns an error", assertReturnsError)
@@ -232,7 +233,7 @@ var _ = Describe("Core tests", func() {
 				}).Should(HaveLen(1))
 			})
 			It("returns container resource allocated in controller", func() {
-				container, err := testedCore.CreateEndpoint(dockerNetID, endpointID)
+				container, err := testedCore.CreateEndpoint(dockerNetID, endpointID, nil)
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(container.IP).To(MatchRegexp(`1.2.3.[0-9]+`))
@@ -241,8 +242,16 @@ var _ = Describe("Core tests", func() {
 				Expect(container.VmUUID).ToNot(Equal(""))
 				Expect(container.VmiUUID).ToNot(Equal(""))
 			})
+			It("allocates given IP if provided", func() {
+				ip := net.ParseIP(endpointIP)
+				container, err := testedCore.CreateEndpoint(dockerNetID, endpointID, ip)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(container.IP).To(Equal(ip))
+				Expect(container.PrefixLen).To(Equal(24))
+			})
 			It("configures HNS endpoint", func() {
-				_, err := testedCore.CreateEndpoint(dockerNetID, endpointID)
+				_, err := testedCore.CreateEndpoint(dockerNetID, endpointID, nil)
 				Expect(err).ToNot(HaveOccurred())
 
 				ep, err := localEpRepo.GetEndpoint(endpointID)
@@ -253,17 +262,17 @@ var _ = Describe("Core tests", func() {
 		})
 
 		assertReturnsError := func() {
-			container, err := testedCore.CreateEndpoint(dockerNetID, endpointID)
+			container, err := testedCore.CreateEndpoint(dockerNetID, endpointID, nil)
 			Expect(err).To(HaveOccurred())
 			Expect(container).To(BeNil())
 		}
 		assertDoesNotAllocate := func() {
-			container, err := testedCore.CreateEndpoint(dockerNetID, endpointID)
+			container, err := testedCore.CreateEndpoint(dockerNetID, endpointID, nil)
 			Expect(err).To(HaveOccurred())
 			Expect(container).To(BeNil())
 		}
 		assertDoesNotConfigure := func() {
-			_, err := testedCore.CreateEndpoint(dockerNetID, endpointID)
+			_, err := testedCore.CreateEndpoint(dockerNetID, endpointID, nil)
 			Expect(err).To(HaveOccurred())
 
 			ep, err := localEpRepo.GetEndpoint(endpointID)
@@ -319,7 +328,7 @@ var _ = Describe("Core tests", func() {
 
 		setupLocalEndpointAndContainerInController := func() {
 			setupControllerNetworkAndLocalNetwork()
-			_, err := testedCore.CreateEndpoint(dockerNetID, endpointID)
+			_, err := testedCore.CreateEndpoint(dockerNetID, endpointID, nil)
 			Expect(err).ToNot(HaveOccurred())
 
 			// wait for port association request to arrive before continuing, otherwise there is

@@ -21,6 +21,7 @@ package driver_core
 import (
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 
 	"github.com/Juniper/contrail-windows-docker-driver/core/model"
@@ -73,8 +74,8 @@ func (core *ContrailDriverCore) DeleteNetwork(dockerNetID string) error {
 	return core.LocalContrailNetworksRepo.DeleteNetwork(dockerNetID)
 }
 
-func (core *ContrailDriverCore) CreateEndpoint(dockerNetID, endpointID string) (*model.Container, error) {
-
+func (core *ContrailDriverCore) CreateEndpoint(dockerNetID, endpointID string,
+	optionalStaticIp net.IP) (*model.Container, error) {
 	containerID := core.getIdOfContainerWithEndpoint(endpointID)
 
 	network, err := core.LocalContrailNetworksRepo.GetNetwork(dockerNetID)
@@ -82,7 +83,7 @@ func (core *ContrailDriverCore) CreateEndpoint(dockerNetID, endpointID string) (
 		return nil, err
 	}
 
-	container, err := core.controller.CreateContainerInSubnet(network, containerID)
+	container, err := core.controller.CreateContainerInSubnet(network, containerID, optionalStaticIp)
 	if err != nil {
 		return nil, err
 	}

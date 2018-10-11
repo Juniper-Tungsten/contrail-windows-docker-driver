@@ -522,6 +522,7 @@ var _ = Describe("ControllerAdapterImpl", func() {
 	Describe("getting Contrail instance IP", func() {
 		var testNetwork *types.VirtualNetwork
 		var testInterface *types.VirtualMachineInterface
+
 		BeforeEach(func() {
 			testNetwork = CreateTestNetworkWithSubnet(client.ApiClient, networkName, subnetCIDR,
 				project)
@@ -536,7 +537,7 @@ var _ = Describe("ControllerAdapterImpl", func() {
 					testInterface, testNetwork)
 			})
 			It("returns existing instance IP", func() {
-				instanceIP, err := client.GetOrCreateInstanceIp(testNetwork, testInterface, "")
+				instanceIP, err := client.GetOrCreateInstanceIp(testNetwork, testInterface, "", "")
 				Expect(err).ToNot(HaveOccurred())
 				Expect(instanceIP).ToNot(BeNil())
 				Expect(instanceIP.GetUuid()).To(Equal(testInstanceIP.GetUuid()))
@@ -550,7 +551,7 @@ var _ = Describe("ControllerAdapterImpl", func() {
 		})
 		Context("when instance IP doesn't exist in Contrail", func() {
 			It("creates new instance IP", func() {
-				instanceIP, err := client.GetOrCreateInstanceIp(testNetwork, testInterface, "")
+				instanceIP, err := client.GetOrCreateInstanceIp(testNetwork, testInterface, "", "")
 				Expect(err).ToNot(HaveOccurred())
 				Expect(instanceIP).ToNot(BeNil())
 				Expect(instanceIP.GetInstanceIpAddress()).ToNot(Equal(""))

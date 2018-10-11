@@ -366,37 +366,51 @@ func (c *ControllerAdapterImpl) GetInterfaceMac(iface *types.VirtualMachineInter
 }
 
 func (c *ControllerAdapterImpl) GetOrCreateInstanceIp(net *types.VirtualNetwork,
-	iface *types.VirtualMachineInterface, subnetUuid string) (*types.InstanceIp, error) {
-	instIp, err := types.InstanceIpByName(c.ApiClient, iface.GetName())
-	if err == nil && instIp != nil {
-		return instIp, nil
+	iface *types.VirtualMachineInterface, subnetUuid, ip string) (*types.InstanceIp, error) {
+	instIP, err := types.InstanceIpByName(c.ApiClient, iface.GetName())
+
+	if err == nil && instIP != nil {
+		ipCtrl := instIP.GetInstanceIpAddress()
+
+		if len(ip) > 0 && ip != ipCtrl {
+			return nil, fmt.Errorf("InstanceIp already exists with IP %s different than given %s", ipCtrl, ip)
+		}
+
+		return instIP, nil
 	}
 
-	instIp = &types.InstanceIp{}
-	instIp.SetName(iface.GetName())
-	instIp.SetSubnetUuid(subnetUuid)
+	instIP = &types.InstanceIp{}
+	instIP.SetName(iface.GetName())
+	instIP.SetSubnetUuid(subnetUuid)
+	if len(ip) > 0 {
+		instIP.SetInstanceIpAddress(ip)
+	}
 
-	err = instIp.AddVirtualNetwork(net)
+	err = instIP.AddVirtualNetwork(net)
 	if err != nil {
 		log.Errorf("Failed to add network to instanceIP object: %v", err)
 		return nil, err
 	}
-	err = instIp.AddVirtualMachineInterface(iface)
+	err = instIP.AddVirtualMachineInterface(iface)
 	if err != nil {
 		log.Errorf("Failed to add vmi to instanceIP object: %v", err)
 		return nil, err
 	}
-	err = c.ApiClient.Create(instIp)
+	err = c.ApiClient.Create(instIP)
 	if err != nil {
 		log.Errorf("Failed to instanceIP: %v", err)
 		return nil, err
 	}
 
-	allocatedIP, err := types.InstanceIpByUuid(c.ApiClient, instIp.GetUuid())
+	allocatedIP, err := types.InstanceIpByUuid(c.ApiClient, instIP.GetUuid())
 	if err != nil {
-		log.Errorf("Failed to retreive instanceIP object %s by name: %v", instIp.GetUuid(), err)
+		log.Errorf("Failed to retreive instanceIP object %s by name: %v", instIP.GetUuid(), err)
 		return nil, err
 	}
+	if len(ip) > 0 && allocatedIP.GetInstanceIpAddress() != ip {
+		return nil, fmt.Errorf("Created instanceIp has different ip %s than provided %s", allocatedIP.GetInstanceIpAddress(), ip)
+	}
+
 	return allocatedIP, nil
 }
 
