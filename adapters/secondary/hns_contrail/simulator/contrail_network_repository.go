@@ -56,7 +56,8 @@ func (repo *InMemContrailNetworksRepository) GetNetwork(dockerNetID string) (*mo
 			TenantName:  foundTenantName,
 			NetworkName: foundNetworkName,
 			Subnet: model.Subnet{
-				CIDR: foundSubnetCIDR,
+				CIDR:          foundSubnetCIDR,
+				DNSServerList: []string{},
 			},
 		}, nil
 	} else {
@@ -83,7 +84,8 @@ func (repo *InMemContrailNetworksRepository) ListNetworks() ([]model.Network, er
 			TenantName:  foundTenantName,
 			NetworkName: foundNetworkName,
 			Subnet: model.Subnet{
-				CIDR: foundSubnetCIDR,
+				CIDR:          foundSubnetCIDR,
+				DNSServerList: []string{},
 			},
 		}
 		arr = append(arr, mnet)

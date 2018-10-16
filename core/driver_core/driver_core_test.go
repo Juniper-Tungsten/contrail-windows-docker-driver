@@ -95,6 +95,15 @@ var _ = Describe("Core tests", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(net.Subnet.CIDR).To(Equal(subnetCIDR))
 		})
+		It("passes DNS information from Contrail to HNS", func() {
+			err := testedCore.CreateNetwork(dockerNetID, tenantName, networkName, subnetCIDR)
+			Expect(err).ToNot(HaveOccurred())
+			hnsNet, err := localNetRepo.GetNetwork(dockerNetID)
+			Expect(err).ToNot(HaveOccurred())
+			ctrlNet, err := controller.GetNetworkWithSubnet(tenantName, networkName, subnetCIDR)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(hnsNet.Subnet.DNSServerList).To(Equal(ctrlNet.Subnet.DNSServerList))
+		})
 		type TestCase struct {
 			tenant  string
 			network string

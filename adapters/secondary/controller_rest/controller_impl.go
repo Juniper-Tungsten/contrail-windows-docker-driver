@@ -67,7 +67,7 @@ func (c *ControllerAdapterImpl) NewProject(domain, tenant string) (*types.Projec
 		}
 		return nil, err
 	}
-	if _, err := c.createNetworkIPAM(domain, tenant, DefaultIPAM); err != nil {
+	if _, err := c.createNetworkIPAM(domain, tenant, DefaultIPAM, "default-dns-server"); err != nil {
 		if warn := c.ApiClient.Delete(secGroup); warn != nil {
 			log.Warnf("Failed to delete default security group after failed default IPAM creation: %v", warn)
 		}
@@ -106,8 +106,11 @@ func (c *ControllerAdapterImpl) createSecurityGroup(domain, tenant, name string)
 	return secgroup, nil
 }
 
-func (c *ControllerAdapterImpl) createNetworkIPAM(domain, tenant, name string) (*types.NetworkIpam, error) {
+func (c *ControllerAdapterImpl) createNetworkIPAM(domain, tenant, name, ipamDnsMethod string) (*types.NetworkIpam, error) {
 	ipam := new(types.NetworkIpam)
+	ipamType := &types.IpamType{
+		IpamDnsMethod: ipamDnsMethod}
+	ipam.SetNetworkIpamMgmt(ipamType)
 	ipam.SetFQName("project", []string{domain, tenant, name})
 	if err := c.ApiClient.Create(ipam); err != nil {
 		return nil, err
@@ -240,6 +243,58 @@ func (c *ControllerAdapterImpl) GetDefaultGatewayIp(subnet *types.IpamSubnetType
 		return "", err
 	}
 	return gw, nil
+}
+
+func (c *ControllerAdapterImpl) GetDNSAddresses(net *types.VirtualNetwork, subnet *types.IpamSubnetType) ([]string, error) {
+
+	// if DHCP is enabled there is no point in setting DNS field in HNS Network as DNS configuration will be
+	// passed through DHCP, however, for now, agent doesn't answer DNS requests if DHCP is not enabled in network.
+	// if subnet.EnableDhcp {
+	// 	return []string{}, fmt.Errorf("DHCP is enabled in subnet %s, DNS will not be set", subnet.SubnetUuid)
+	// }
+
+	ipam, err := c.getIPAMForSubnet(net, subnet)
+	if err != nil {
+		return []string{}, err
+	}
+	ipamType := ipam.GetNetworkIpamMgmt()
+	switch ipamType.IpamDnsMethod {
+	case "tenant-dns-server":
+		if ipamType.IpamDnsServer != nil && ipamType.IpamDnsServer.TenantDnsServerAddress != nil {
+			return ipamType.IpamDnsServer.TenantDnsServerAddress.IpAddress, nil
+		}
+		return []string{}, nil
+	case "virtual-dns-server":
+		return []string{subnet.DnsServerAddress}, nil
+	// Default mode means that default gateway is set as DNS address
+	case "default-dns-server":
+		return []string{subnet.DefaultGateway}, nil
+	case "none":
+		return []string{}, nil
+	// IpamDnsMethod might not be specified and in that case it will be treated as "none" DNS mode
+	default:
+		return []string{}, fmt.Errorf("Not supported DNS method %s", ipamType.IpamDnsMethod)
+	}
+}
+
+func (c *ControllerAdapterImpl) getIPAMForSubnet(net *types.VirtualNetwork, subnet *types.IpamSubnetType) (
+	*types.NetworkIpam, error) {
+	ipamReferences, err := net.GetNetworkIpamRefs()
+	if err != nil {
+		log.Errorf("Failed to get ipam references: %v", err)
+		return nil, err
+	}
+	for _, ref := range ipamReferences {
+		attribute := ref.Attr
+		to := ref.To
+		ipamSubnets := attribute.(types.VnSubnetsType).IpamSubnets
+		for _, ipamSubnet := range ipamSubnets {
+			if ipamSubnet.SubnetUuid == subnet.SubnetUuid {
+				return types.NetworkIpamByName(c.ApiClient, strings.Join(to, ":"))
+			}
+		}
+	}
+	return nil, fmt.Errorf("Failed to get NetworkIpam for given subnet %s in network %s", subnet.SubnetUuid, net.GetUuid())
 }
 
 func (c *ControllerAdapterImpl) getCidrFromIpamSubnet(ipam *types.IpamSubnetType) string {
