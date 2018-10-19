@@ -16,6 +16,8 @@
 package ports
 
 import (
+	"net"
+
 	"github.com/Microsoft/hcsshim"
 
 	"github.com/Juniper/contrail-go-api/types"
@@ -48,7 +50,7 @@ type Controller interface {
 	CreateNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*types.VirtualNetwork, error)
 	GetNetworkWithSubnet(tenantName, networkName, subnetCIDR string) (*model.Network, error)
 
-	CreateContainerInSubnet(net *model.Network, containerID string) (*model.Container, error)
+	CreateContainerInSubnet(net *model.Network, containerID string, optionalStaticIP net.IP) (*model.Container, error)
 	DeleteContainer(containerID string) error
 	GetContainer(containerID string) (*model.Container, error)
 

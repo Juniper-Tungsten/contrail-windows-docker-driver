@@ -83,7 +83,8 @@ func (c *ControllerAdapter) GetDefaultGatewayIp(ipamSubnet *types.IpamSubnetType
 	return c.controller.GetDefaultGatewayIp(ipamSubnet)
 }
 
-func (c *ControllerAdapter) CreateContainerInSubnet(network *model.Network, containerID string) (*model.Container, error) {
+func (c *ControllerAdapter) CreateContainerInSubnet(network *model.Network, containerID string,
+	optionalStaticIp net.IP) (*model.Container, error) {
 	retreivedNetwork, ipamSubnet, err := c.controller.GetNetworkWithSubnet(network.TenantName, network.NetworkName, network.Subnet.CIDR)
 	if err != nil {
 		return nil, err
@@ -99,7 +100,12 @@ func (c *ControllerAdapter) CreateContainerInSubnet(network *model.Network, cont
 		return nil, err
 	}
 
-	ipobj, err := c.controller.GetOrCreateInstanceIp(retreivedNetwork, vif, ipamSubnet.SubnetUuid)
+	validIPStr := ""
+	if optionalStaticIp != nil {
+		validIPStr = optionalStaticIp.String()
+	}
+
+	ipobj, err := c.controller.GetOrCreateInstanceIp(retreivedNetwork, vif, ipamSubnet.SubnetUuid, validIPStr)
 	if err != nil {
 		return nil, err
 	}

@@ -21,6 +21,7 @@ package cnm
 import (
 	"errors"
 	"fmt"
+	"net"
 
 	"github.com/Juniper/contrail-windows-docker-driver/logging"
 	"github.com/docker/go-plugins-helpers/network"
@@ -98,24 +99,41 @@ func (d *ServerCNM) FreeNetwork(req *network.FreeNetworkRequest) error {
 }
 
 func (d *ServerCNM) CreateEndpoint(req *network.CreateEndpointRequest) (
-	*network.CreateEndpointResponse, error) {
+	res *network.CreateEndpointResponse, err error) {
 	log.Debugln(loggerRequestPrepend, "CreateEndpoint", logging.VariableToJSON(req))
+	var interfaceIP net.IP
 
-	container, err := d.Core.CreateEndpoint(req.NetworkID, req.EndpointID)
+	if req.Interface == nil || len(req.Interface.Address) == 0 {
+		interfaceIP = nil
+	} else {
+		interfaceIP, _, err = net.ParseCIDR(req.Interface.Address)
+		if err != nil {
+			log.Errorln(err)
+			return
+		}
+	}
+
+	container, err := d.Core.CreateEndpoint(req.NetworkID, req.EndpointID, interfaceIP)
+
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	ipCIDR := fmt.Sprintf("%s/%v", container.IP, container.PrefixLen)
-	r := &network.CreateEndpointResponse{
-		Interface: &network.EndpointInterface{
-			Address:    ipCIDR,
-			MacAddress: container.Mac,
-		},
+	intRsp := &network.EndpointInterface{
+		MacAddress: container.Mac,
 	}
 
-	log.Debugln(loggerResponsePrepend, "CreateEndpoint", logging.VariableToJSON(r))
-	return r, nil
+	// response to libnetwork cannot be filled with ip if ip was supplied in request
+	if interfaceIP == nil {
+		intRsp.Address = fmt.Sprintf("%s/%v", container.IP, container.PrefixLen)
+	}
+
+	res = &network.CreateEndpointResponse{
+		Interface: intRsp,
+	}
+
+	log.Debugln(loggerResponsePrepend, "CreateEndpoint", logging.VariableToJSON(res))
+	return
 }
 
 func (d *ServerCNM) DeleteEndpoint(req *network.DeleteEndpointRequest) error {
