@@ -6,7 +6,8 @@
   "files": {
     "guid": "ca8cbb44-2a0d-4f95-9375-dccabc92ffc1",
     "items": [
-      "build/contrail-windows-docker.exe"
+      "build/contrail-windows-docker.exe",
+      "build/contrail-cnm-plugin.exe"
     ]
   },
   "env": {

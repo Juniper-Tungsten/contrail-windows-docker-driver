@@ -28,6 +28,7 @@ if (-not $SkipExe) {
     if ($LastExitCode -ne 0) {
         throw "Build failed."
     }
+    Copy-Item (Join-Path $OutDir "contrail-windows-docker.exe") (Join-Path $OutDir "contrail-cnm-plugin.exe")
 } else {
     Write-Host "** Skipping building of .exe"
 }

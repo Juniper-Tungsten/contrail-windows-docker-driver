@@ -65,3 +65,8 @@ ignored = ["github.com/Juniper/contrail-go-api/types"]
 [[constraint]]
   name = "github.com/Juniper/contrail-go-api"
   branch = "master"
+
+[prune]
+  unused-packages = true
+  go-tests = true
+  non-go = true
