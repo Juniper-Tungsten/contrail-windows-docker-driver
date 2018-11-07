@@ -17,18 +17,18 @@ param([switch] $SkipExe,
       [switch] $SkipTests,
       [switch] $SkipMSI)
 
-$OutDir = "$pwd/build"
+$OutDir = "$pwd\build"
 
 Write-Host "Starting build. Output dir = $OutDir"
 
 if (-not $SkipExe) {
     Write-Host "** Building .exe..."
-    go build -o (Join-Path $OutDir "contrail-windows-docker.exe") -v .
+    go build -o "$OutDir\contrail-cnm-plugin.exe" -v .
 
     if ($LastExitCode -ne 0) {
         throw "Build failed."
     }
-    Copy-Item (Join-Path $OutDir "contrail-windows-docker.exe") (Join-Path $OutDir "contrail-cnm-plugin.exe")
+    Copy-Item "$OutDir\contrail-cnm-plugin.exe" "$OutDir\contrail-windows-docker.exe"
 } else {
     Write-Host "** Skipping building of .exe"
 }
@@ -50,16 +50,13 @@ if (-not $SkipTests) {
 
 if (-not $SkipMSI) {
     Write-Host "** Building .MSI..."
-    go-msi make --arch x64 --version 0.1 --keep `
-        --msi (Join-Path $OutDir "docker-driver.msi") `
-        --path "./wix.json" `
-        --src "./template" `
-        --license "./LICENSE_MSI.txt" `
-        --out (Join-Path $OutDir "gomsi")
+    candle.exe -nologo -I -o "$OutDir\msi.wixobj" msi.wxs
+    light.exe -nologo -out "$OutDir\contrail-cnm-plugin.msi" "$OutDir\msi.wixobj"
 
     if ($LastExitCode -ne 0) {
         throw "Build failed."
     }
+    Copy-Item "$OutDir\contrail-cnm-plugin.msi" "$OutDir\docker-driver.msi"
 } else {
     Write-Host "** Skipping building of MSI"
 }
