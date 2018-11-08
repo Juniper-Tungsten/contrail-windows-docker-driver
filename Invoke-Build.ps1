@@ -28,7 +28,6 @@ if (-not $SkipExe) {
     if ($LastExitCode -ne 0) {
         throw "Build failed."
     }
-    Copy-Item "$OutDir\contrail-cnm-plugin.exe" "$OutDir\contrail-windows-docker.exe"
 } else {
     Write-Host "** Skipping building of .exe"
 }
@@ -56,7 +55,6 @@ if (-not $SkipMSI) {
     if ($LastExitCode -ne 0) {
         throw "Build failed."
     }
-    Copy-Item "$OutDir\contrail-cnm-plugin.msi" "$OutDir\docker-driver.msi"
 } else {
     Write-Host "** Skipping building of MSI"
 }

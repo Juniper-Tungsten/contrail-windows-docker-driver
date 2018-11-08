@@ -4,9 +4,9 @@
 
 ### Third party dependencies
 
-#. Download `dep` package manager for golang: https://github.com/golang/dep
+1. Download `dep` package manager for golang: https://github.com/golang/dep
 
-#. Fetch dependencies into vendor/ directory:
+1. Fetch dependencies into vendor/ directory:
     ```
     dep ensure -v
     ```
@@ -19,7 +19,7 @@
     git clone https://github.com/Juniper/contrail-api-client C:\some_dir\
     ```
 
-#. Generate Golang API
+1. Generate Golang API
 
     Requirements: python version <= 2.7.13, lxml package
 
@@ -30,7 +30,7 @@
     C:\some_dir\contrail-api-client\generateds\generateDS.py -q -f -o C:\some_dir\types\ -g golang-api C:\some_dir\contrail-api-client\schema\vnc_cfg.xsd
     ```
 
-#. Copy generated files to specific third party vendor package
+1. Copy generated files to specific third party vendor package
 
     ```
     cp C:\some_dir\types\* .\vendor\github.com\Juniper\contrail-go-api\types\
@@ -45,7 +45,7 @@
     go get github.com/onsi/gomega/...
     ```
 
-#. Install WiX toolset
+1. Install WiX toolset
 
     See: https://github.com/wixtoolset/wix3/releases/tag/wix3111rtm
 
@@ -53,11 +53,11 @@
     Note that WiX's MSBuild requires .NET 3.5 to be installed. See section 'WiX system requirements':
     http://wixtoolset.org/documentation/manual/v3/main/
 
-#. Install chocolatey
+1. Install chocolatey
 
     See: https://chocolatey.org/install
 
-#. Invoke build
+1. Invoke build
 
     ```
     .\Invoke-Build.ps1 [-SkipExe] [-SkipTests] [-SkipMSI]

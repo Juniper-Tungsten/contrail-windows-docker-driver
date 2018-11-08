@@ -17,11 +17,11 @@ param([switch] $RunIntegrationTests)
 
 ./Scripts/New-BakedTestData.ps1
 
-Write-Host "Running docker driver unit tests..."
+Write-Host "Running CNM plugin unit tests..."
 go test -coverpkg=./... -covermode count -coverprofile="cover_unit.out" -tags unit . -- ginkgo.trace
 
 if ($RunIntegrationTests) {
-    Write-Host "Running docker driver integration tests..."
+    Write-Host "Running CNM plugin integration tests..."
     go test -coverpkg=./... -covermode count -coverprofile="cover_integration.out" -tags integration .
 
     .\Scripts\Merge-CoverFiles.ps1 -UnitCoverFile "cover_unit.out" `
@@ -30,7 +30,6 @@ if ($RunIntegrationTests) {
     $Unit = .\Scripts\Invoke-CodeCovAnalysis.ps1 -CoverFile "cover_unit.out"
     $Int = .\Scripts\Invoke-CodeCovAnalysis.ps1 -CoverFile "cover_integration.out"
     $Total = .\Scripts\Invoke-CodeCovAnalysis.ps1 -CoverFile "cover_merged.out"
-    
 } else {
     $Unit = .\Scripts\Invoke-CodeCovAnalysis.ps1 -CoverFile "cover_unit.out"
     $Int = "N/A"

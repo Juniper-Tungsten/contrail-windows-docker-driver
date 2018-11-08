@@ -12,16 +12,12 @@
                             <File Id="CnmPlugin" Source="build/contrail-cnm-plugin.exe"/>
                         </Component>
                     </Directory>
-                    <Component Id="DockerDriverFiles" Guid="9745A0CD-2EF6-450A-82BE-90F43FC750C5" Win64="yes">
-                        <File Id="DockerDriver" Source="build/contrail-windows-docker.exe"/>
-                    </Component>
                 </Directory>
             </Directory>
         </Directory>
 
         <Feature Id="DefaultFeature" Level="1">
             <ComponentRef Id="CnmPluginFiles"/>
-            <ComponentRef Id="DockerDriverFiles"/>
         </Feature>
     </Product>
 </Wix>
