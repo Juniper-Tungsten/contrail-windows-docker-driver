@@ -50,7 +50,7 @@ if (-not $SkipTests) {
 if (-not $SkipMSI) {
     Write-Host "** Building .MSI..."
     candle.exe -nologo -I -o "$OutDir\msi.wixobj" msi.wxs
-    light.exe -nologo -out "$OutDir\contrail-cnm-plugin.msi" "$OutDir\msi.wixobj"
+    light.exe -nologo -ext WixUtilExtension.dll -out "$OutDir\contrail-cnm-plugin.msi" "$OutDir\msi.wixobj"
 
     if ($LastExitCode -ne 0) {
         throw "Build failed."
