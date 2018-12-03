@@ -19,8 +19,8 @@ package driver_core_test
 
 import (
 	"net"
-	"net/http"
 	"net/url"
+	"net/http"
 	"regexp"
 	"testing"
 
@@ -63,9 +63,12 @@ var _ = Describe("Core tests", func() {
 	var controller ports.Controller
 	var localNetRepo ports.LocalContrailNetworkRepository
 	var localEpRepo ports.LocalContrailEndpointRepository
+	var testAgentServer *ghttp.Server
 
 	BeforeEach(func() {
-		testedCore, controller, localNetRepo, localEpRepo = newSimulatedModulesUnderTest()
+		var agentURL *url.URL
+		testAgentServer, agentURL = startTestAgentServer()
+		testedCore, controller, localNetRepo, localEpRepo = newSimulatedModulesUnderTest(agentURL)
 	})
 
 	Context("CreateNetwork", func() {
@@ -215,18 +218,14 @@ var _ = Describe("Core tests", func() {
 	})
 
 	Context("CreateEndpoint", func() {
-		var recvChan chan interface{}
-		var server *ghttp.Server
 		BeforeEach(func() {
-			recvChan = make(chan interface{})
-			server = testServer(recvChan)
-			server.AppendHandlers(
+			testAgentServer.AppendHandlers(
 				ghttp.VerifyRequest("POST", "/port"),
 				ghttp.RespondWith(http.StatusOK, ""),
 			)
 		})
 		AfterEach(func() {
-			server.Close()
+			testAgentServer.Close()
 		})
 
 		Context("Controller network and local network exist", func() {
@@ -238,7 +237,7 @@ var _ = Describe("Core tests", func() {
 				// the next test case which would be hard to debug.
 				By("notifies port listener about association")
 				Eventually(func() []*http.Request {
-					return server.ReceivedRequests()
+					return testAgentServer.ReceivedRequests()
 				}).Should(HaveLen(1))
 			})
 			It("returns container resource allocated in controller", func() {
@@ -295,7 +294,7 @@ var _ = Describe("Core tests", func() {
 			// the next test case which would be hard to debug.
 			By("does not notify port listener about association")
 			Consistently(func() []*http.Request {
-				return server.ReceivedRequests()
+				return testAgentServer.ReceivedRequests()
 			}).Should(HaveLen(0))
 		}
 		Context("Controller network exists, but local network does not exist", func() {
@@ -315,24 +314,20 @@ var _ = Describe("Core tests", func() {
 	})
 
 	Context("DeleteEndpoint", func() {
-		var recvChan chan interface{}
-		var server *ghttp.Server
 		BeforeEach(func() {
-			recvChan = make(chan interface{})
-			server = testServer(recvChan)
-			server.AppendHandlers(
+			testAgentServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("POST", "/port"),
 					ghttp.RespondWith(http.StatusOK, ""),
 				),
 			)
 			// We need to use RouteToHandler method here, because it accepts regex paths.
-			server.RouteToHandler("DELETE", regexp.MustCompile(`port/.*`), ghttp.CombineHandlers(
+			testAgentServer.RouteToHandler("DELETE", regexp.MustCompile(`port/.*`), ghttp.CombineHandlers(
 				ghttp.RespondWith(http.StatusOK, ""),
 			))
 		})
 		AfterEach(func() {
-			server.Close()
+			testAgentServer.Close()
 		})
 
 		setupLocalEndpointAndContainerInController := func() {
@@ -343,7 +338,7 @@ var _ = Describe("Core tests", func() {
 			// wait for port association request to arrive before continuing, otherwise there is
 			// a possible race condition with port disassociation request.
 			Eventually(func() []*http.Request {
-				return server.ReceivedRequests()
+				return testAgentServer.ReceivedRequests()
 			}).Should(HaveLen(1))
 		}
 
@@ -363,7 +358,7 @@ var _ = Describe("Core tests", func() {
 			// we expect two requests to have arrived: first for port association in test setup;
 			// the other is the one we actually look for.
 			Eventually(func() []*http.Request {
-				return server.ReceivedRequests()
+				return testAgentServer.ReceivedRequests()
 			}).Should(HaveLen(2))
 		}
 
@@ -403,7 +398,7 @@ var _ = Describe("Core tests", func() {
 				By("does not notify port listener about dissacociation")
 				// we expect only one request to have arrived - for port association in setup;
 				Consistently(func() []*http.Request {
-					return server.ReceivedRequests()
+					return testAgentServer.ReceivedRequests()
 				}).Should(HaveLen(1))
 			})
 			It("returns an error", assertReturnsError)
@@ -419,7 +414,7 @@ var _ = Describe("Core tests", func() {
 	})
 })
 
-func newSimulatedModulesUnderTest() (c *driver_core.ContrailDriverCore, controller ports.Controller,
+func newSimulatedModulesUnderTest(agentURL *url.URL) (c *driver_core.ContrailDriverCore, controller ports.Controller,
 	netRepo ports.LocalContrailNetworkRepository,
 	epRepo ports.LocalContrailEndpointRepository) {
 	ext := &hyperv_extension.HyperVExtensionSimulator{
@@ -434,8 +429,7 @@ func newSimulatedModulesUnderTest() (c *driver_core.ContrailDriverCore, controll
 	epRepo = netSim.NewInMemEndpointRepository()
 
 	// TODO: Implement simulator for Agent.
-	serverUrl, _ := url.Parse("http://127.0.0.1:9091")
-	agent := agent.NewAgentRestAPI(http.DefaultClient, serverUrl)
+	agent := agent.NewAgentRestAPI(http.DefaultClient, agentURL)
 
 	var err error
 	c, err = driver_core.NewContrailDriverCore(vrouter, controller, agent, netRepo, epRepo)
@@ -456,14 +450,11 @@ func testNetwork(c ports.Controller) *types.VirtualNetwork {
 	return network
 }
 
-func testServer(recv chan interface{}) *ghttp.Server {
+func startTestAgentServer() (*ghttp.Server, *url.URL) {
 	// TODO: Refactor this test to use listener simulator, instead this test
 	// http server, when it's implemented.
-	server := ghttp.NewUnstartedServer()
-	listener, err := net.Listen("tcp", "127.0.0.1:9091")
+	server := ghttp.NewServer()
+	parsedURL, err := url.Parse(server.URL())
 	Expect(err).ToNot(HaveOccurred())
-	server.HTTPTestServer.Listener = listener
-
-	server.Start()
-	return server
+	return server, parsedURL
 }

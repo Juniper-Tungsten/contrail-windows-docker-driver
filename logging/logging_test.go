@@ -19,8 +19,8 @@ package logging_test
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"testing"
 
@@ -128,10 +128,18 @@ var _ = Describe("Logging tests", func() {
 	})
 
 	Context("HTTP response log text test", func() {
-		client := &http.Client{}
-		server := testServer(make(chan interface{}))
-		testHeader := http.Header{}
-		testHeader.Add("headerTxt", "Ala Ma Kota W Glowie")
+		var testAgentServer *ghttp.Server
+		var testAgentURL string
+		var client *http.Client
+
+		BeforeEach(func() {
+			client = &http.Client{}
+			testAgentServer, testAgentURL = startTestAgentServer()
+		})
+
+		AfterEach(func() {
+			testAgentServer.Close()
+		})
 
 		It("returns error message when response is nil", func() {
 			var response *http.Response
@@ -142,13 +150,13 @@ var _ = Describe("Logging tests", func() {
 		})
 
 		It("returns information when response body is nil", func() {
-			server.AppendHandlers(
+			testAgentServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/"),
 					ghttp.RespondWith(http.StatusOK, ""),
 				),
 			)
-			request, _ := http.NewRequest("GET", "http://127.0.0.1:9091/", nil)
+			request, _ := http.NewRequest("GET", fmt.Sprintf("%s/", testAgentURL), nil)
 
 			response, _ := client.Do(request)
 			response.Body = nil
@@ -159,13 +167,13 @@ var _ = Describe("Logging tests", func() {
 		})
 
 		It("shows correct body when it exists", func() {
-			server.AppendHandlers(
+			testAgentServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/bodyTest"),
 					ghttp.RespondWith(http.StatusOK, "Ala Ma Kota"),
 				),
 			)
-			request, _ := http.NewRequest("GET", "http://127.0.0.1:9091/bodyTest", nil)
+			request, _ := http.NewRequest("GET", fmt.Sprintf("%s/bodyTest", testAgentURL), nil)
 
 			response, _ := client.Do(request)
 
@@ -175,13 +183,13 @@ var _ = Describe("Logging tests", func() {
 		})
 
 		It("preserves body in response", func() {
-			server.AppendHandlers(
+			testAgentServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/bodyTest"),
 					ghttp.RespondWith(http.StatusOK, "Ala Ma Kota"),
 				),
 			)
-			request, _ := http.NewRequest("GET", "http://127.0.0.1:9091/bodyTest", nil)
+			request, _ := http.NewRequest("GET", fmt.Sprintf("%s/bodyTest", testAgentURL), nil)
 
 			response, _ := client.Do(request)
 
@@ -193,13 +201,15 @@ var _ = Describe("Logging tests", func() {
 		})
 
 		It("shows correct header", func() {
-			server.AppendHandlers(
+			h := http.Header{}
+			h.Add("headerTxt", "Ala Ma Kota W Glowie")
+			testAgentServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/headerTest"),
-					ghttp.RespondWith(http.StatusOK, "", testHeader),
+					ghttp.RespondWith(http.StatusOK, "", h),
 				),
 			)
-			request, _ := http.NewRequest("GET", "http://127.0.0.1:9091/headerTest", nil)
+			request, _ := http.NewRequest("GET", fmt.Sprintf("%s/headerTest", testAgentURL), nil)
 
 			response, _ := client.Do(request)
 			ret := logging.HTTPMessage(packageTag, response)
@@ -208,7 +218,7 @@ var _ = Describe("Logging tests", func() {
 		})
 
 		It("shows correct status", func() {
-			server.AppendHandlers(
+			testAgentServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/status/200"),
 					ghttp.RespondWith(http.StatusOK, ""),
@@ -223,9 +233,9 @@ var _ = Describe("Logging tests", func() {
 				),
 			)
 
-			request200, _ := http.NewRequest("GET", "http://127.0.0.1:9091/status/200", nil)
-			request404, _ := http.NewRequest("GET", "http://127.0.0.1:9091/status/404", nil)
-			request500, _ := http.NewRequest("GET", "http://127.0.0.1:9091/status/500", nil)
+			request200, _ := http.NewRequest("GET", fmt.Sprintf("%s/status/200", testAgentURL), nil)
+			request404, _ := http.NewRequest("GET", fmt.Sprintf("%s/status/404", testAgentURL), nil)
+			request500, _ := http.NewRequest("GET", fmt.Sprintf("%s/status/500", testAgentURL), nil)
 
 			response200, _ := client.Do(request200)
 			response404, _ := client.Do(request404)
@@ -241,14 +251,14 @@ var _ = Describe("Logging tests", func() {
 		})
 
 		It("shows correct tag", func() {
-			server.AppendHandlers(
+			testAgentServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("GET", "/"),
 					ghttp.RespondWith(http.StatusOK, ""),
 				),
 			)
 
-			request, _ := http.NewRequest("GET", "http://127.0.0.1:9091/", nil)
+			request, _ := http.NewRequest("GET", fmt.Sprintf("%s/", testAgentURL), nil)
 
 			response, _ := client.Do(request)
 
@@ -260,11 +270,7 @@ var _ = Describe("Logging tests", func() {
 	})
 })
 
-func testServer(recv chan interface{}) *ghttp.Server {
-	server := ghttp.NewUnstartedServer()
-	listener, _ := net.Listen("tcp", "127.0.0.1:9091")
-	server.HTTPTestServer.Listener = listener
-
-	server.Start()
-	return server
+func startTestAgentServer() (*ghttp.Server, string) {
+	server := ghttp.NewServer()
+	return server, server.URL()
 }
