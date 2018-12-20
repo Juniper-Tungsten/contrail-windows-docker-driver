@@ -2,7 +2,7 @@
 <!--
     msi.wxs
 
-    Copyright (c) 2017 Juniper Networks, Inc. All rights reserved.
+    Copyright (c) 2018 Juniper Networks, Inc. All rights reserved.
 -->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
     <Product Id="47DD6748-F596-4E97-A087-C9C386466C5F" UpgradeCode="730039F2-F0CE-46D2-90AB-746B97969FF8" Name="Contrail CNM Plugin" Version="1.0.0" Manufacturer="Juniper Networks" Language="1033">

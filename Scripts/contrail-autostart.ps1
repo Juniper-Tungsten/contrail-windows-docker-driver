@@ -4,8 +4,10 @@
 
 $ErrorActionPreference = "Stop"
 
+$CnmPluginSpecPath = "C:\ProgramData\docker\plugins\Contrail.spec"
+
 function Initialize-Logger {
-    New-Item -ItemType Directory -Path C:\ProgramData\Contrail\var\log\contrail -Force
+    New-Item -ItemType Directory -Path C:\ProgramData\Contrail\var\log\contrail -Force | Out-Null
 }
 
 function Write-Log {
@@ -17,26 +19,29 @@ function Write-Log {
     Add-Content $Logfile -Value $Message
 }
 
-function Wait-CnmPluginPipe {
-    function Test-CnmPluginPipe {
-        $PipePath = "//./pipe/Contrail"
-        return (Test-Path $PipePath)
+function Wait-CnmPluginServing {
+    function Test-CnmPluginServing {
+        # using Test-Path on pipe actually blocks it (even for some time after cmdlet returns!)
+        # so instead we run Test-Path on .spec file being created by CNM Plugin
+        return (Test-Path $CnmPluginSpecPath)
     }
 
     $MaxAttempts = 5
     $TimeoutInSeconds = 20
 
     $TimesToGo = $MaxAttempts
-    While ((-not (Test-CnmPluginPipe)) -and ($TimesToGo -gt 0)) {
+    $IsServing = Test-CnmPluginServing
+    While ((-not $IsServing) -and ($TimesToGo -gt 0)) {
         Start-Sleep -Seconds $TimeoutInSeconds
         $TimesToGo = $TimesToGo - 1
+        $IsServing = Test-CnmPluginServing
     }
 
-    if (Test-CnmPluginPipe) {
-        Write-Log "Waiting for CNM plugin pipe succeeded"
+    if ($IsServing) {
+        Write-Log "Waiting for CNM plugin to start serving succeeded"
         return $True
     } else {
-        Write-Log "Waiting for CNM plugin pipe failed"
+        Write-Log "Waiting for CNM plugin to start serving failed"
         return $False
     }
 }
@@ -79,6 +84,12 @@ function Remove-HnsNetworks {
     Get-ContainerNetwork | Remove-ContainerNetwork -Force
 }
 
+function Remove-CnmPluginSpec {
+    Write-Log "Removing CNM Plugin spec file"
+
+    Remove-Item -Path $CnmPluginSpecPath -Force -ErrorAction SilentlyContinue
+}
+
 function Initialize-ComputeNode {
     Initialize-Logger
     Write-Log "Entering contrail-autostart"
@@ -86,6 +97,7 @@ function Initialize-ComputeNode {
     Stop-Service docker
     Remove-HnsNetworks
     Remove-AgentPorts
+    Remove-CnmPluginSpec
 
     Start-Service docker
     Remove-AllContainers
@@ -93,7 +105,7 @@ function Initialize-ComputeNode {
     Write-Log "Starting contrail-cnm-plugin"
     Start-Service contrail-cnm-plugin
 
-    if (Wait-CnmPluginPipe) {
+    if (Wait-CnmPluginServing) {
         Write-Log "Starting contrail-vrouter-agent"
         Start-Service contrail-vrouter-agent
         return $True
