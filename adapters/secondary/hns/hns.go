@@ -118,42 +118,10 @@ func CreateHNSNetwork(configuration *hcsshim.HNSNetwork) (string, error) {
 func DeleteHNSNetwork(hnsID string) error {
 	log.Infoln("Deleting HNS network", hnsID)
 
-	toDelete, err := GetHNSNetwork(hnsID)
+	_, err := hcsshim.HNSNetworkRequest("DELETE", hnsID, "")
 	if err != nil {
 		log.Errorln(err)
 		return err
-	}
-
-	networks, err := ListHNSNetworks()
-	if err != nil {
-		log.Errorln(err)
-		return err
-	}
-
-	adapterStillInUse := false
-	for _, network := range networks {
-		if network.Id != toDelete.Id &&
-			network.NetworkAdapterName == toDelete.NetworkAdapterName {
-			adapterStillInUse = true
-			break
-		}
-	}
-
-	_, err = hcsshim.HNSNetworkRequest("DELETE", hnsID, "")
-	if err != nil {
-		log.Errorln(err)
-		return err
-	}
-
-	if !adapterStillInUse {
-		// If the last network that uses an adapter is deleted, then the underlying vswitch is
-		// also deleted. During this period, the adapter will temporarily lose network
-		// connectivity while it reacquires IPv4. We need to wait for it.
-		// https://github.com/Microsoft/hcsshim/issues/95
-		if err := win_networking.WaitForValidIPReacquisition(toDelete.NetworkAdapterName); err != nil {
-			log.Errorln(err)
-			return err
-		}
 	}
 
 	return nil

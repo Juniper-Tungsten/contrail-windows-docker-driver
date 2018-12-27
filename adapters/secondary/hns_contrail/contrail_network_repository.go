@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns"
+	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/vmswitch"
 	"github.com/Juniper/contrail-windows-docker-driver/core/model"
 	"github.com/Microsoft/hcsshim"
 )
@@ -35,12 +36,14 @@ type HNSContrailNetworksRepository struct {
 	// Contrail networks to, e.g. Ethernet0. It is NOT the adapter created by HNS (e.g. "HNS
 	// Transparent").
 	physDataplaneNetAdapter string
+	vswitchName             string
 	associations            HNSDBNetworkAssociationMechanism
 }
 
-func NewHNSContrailNetworksRepository(physDataplaneNetAdapter string) *HNSContrailNetworksRepository {
+func NewHNSContrailNetworksRepository(physDataplaneNetAdapter, vswitchName string) *HNSContrailNetworksRepository {
 	return &HNSContrailNetworksRepository{
 		physDataplaneNetAdapter: physDataplaneNetAdapter,
+		vswitchName:             vswitchName,
 		associations:            HNSDBNetworkAssociationMechanism{},
 	}
 }
@@ -67,6 +70,12 @@ func (repo *HNSContrailNetworksRepository) CreateNetwork(dockerNetID string, net
 		NetworkAdapterName: string(repo.physDataplaneNetAdapter),
 		Subnets:            subnets,
 		DNSServerList:      strings.Join(network.Subnet.DNSServerList, ","),
+	}
+
+	if switchState, err := vmswitch.DoesSwitchExist(repo.vswitchName); err != nil {
+		panic(err)
+	} else if switchState == vmswitch.DELETED || switchState == vmswitch.DELETING {
+		panic("VmSwitch doesn't exist")
 	}
 
 	_, err = hns.CreateHNSNetwork(configuration)
