@@ -17,6 +17,7 @@ package vmswitch
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/win_networking"
@@ -25,22 +26,34 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type switchState int
+
+const (
+	DELETED switchState = iota
+	DELETING
+	PRESENT
+	UNKNOWN
+)
+
 const (
 	// rootNetworkName is a name of root HNS network created solely for the purpose of
 	// having a virtual switch
 	rootNetworkName = "ContrailRootNetwork"
 )
 
-func DoesSwitchExist(name string) (bool, error) {
-	c := []string{"Get-VMSwitch", "-Name", fmt.Sprintf("\"%s\"", name)}
+func DoesSwitchExist(name string) (switchState, error) {
+	c := []string{"Get-VMSwitch", "-Name", fmt.Sprintf("\"%s\"", name), "|", "Select", "-ExpandProperty", "isDeleted"}
 	stdout, _, err := powershell.CallPowershell(c...)
 	if err != nil {
-		return false, err
-	} else if stdout == "" {
-		return false, nil
-	} else {
-		return true, nil
+		return UNKNOWN, err
 	}
+	if stdout == "" {
+		return DELETED, nil
+	}
+	if strings.Contains(stdout, "True") {
+		return DELETING, nil
+	}
+	return PRESENT, nil
 }
 
 func EnsureSwitchExists(vmSwitchName, nameOfAdapterToUse string) error {
@@ -67,13 +80,15 @@ func EnsureSwitchExists(vmSwitchName, nameOfAdapterToUse string) error {
 		// Before we CreateHNSNetwork we need to make sure, that interface we want to attach the vmswitch
 		// to has correct IP address. Otherwise, HNS will complain. The interface exists only, if root HNS
 		// network doesn't yet exist. It disappears the moment vmswitch is created.
-		ext, _ := DoesSwitchExist(vmSwitchName)
-		if !ext {
+		ext, err := DoesSwitchExist(vmSwitchName)
+		if err != nil {
+			return err
+		}
+		if ext == DELETED || ext == DELETING {
 			if err := win_networking.WaitForValidIPReacquisition(nameOfAdapterToUse); err != nil {
 				return err
 			}
 		}
-
 		rootNetID, err := hns.CreateHNSNetwork(configuration)
 		if err != nil {
 			return err

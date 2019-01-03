@@ -86,9 +86,9 @@ func (hvvr *hyperVvRouterForwardingExtension) inspectExtensionProperty(property 
 func (hvvr *hyperVvRouterForwardingExtension) callOnSwitchExtension(command string, optionals ...string) (string,
 	error) {
 
-	if switchExists, err := vmswitch.DoesSwitchExist(hvvr.vswitchName); err != nil {
+	if switchState, err := vmswitch.DoesSwitchExist(hvvr.vswitchName); err != nil {
 		return "", err
-	} else if !switchExists {
+	} else if switchState == vmswitch.DELETED || switchState == vmswitch.DELETING {
 		return "", errors.New("could not perform action on vmswitch extension, because vmswitch was not found")
 	}
 

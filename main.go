@@ -111,7 +111,7 @@ func run(cfg *configuration.Configuration) error {
 
 	agent := agent.NewAgentRestAPI(http.DefaultClient, agentUrl)
 
-	netRepo := hns_contrail.NewHNSContrailNetworksRepository(cfg.Driver.Adapter)
+	netRepo := hns_contrail.NewHNSContrailNetworksRepository(cfg.Driver.Adapter, cfg.Driver.VSwitchName)
 
 	epRepo := &hns_contrail.HNSEndpointRepository{}
 
