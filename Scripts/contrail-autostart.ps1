@@ -26,7 +26,7 @@ function Wait-CnmPluginServing {
         return (Test-Path $CnmPluginSpecPath)
     }
 
-    $MaxAttempts = 5
+    $MaxAttempts = 10
     $TimeoutInSeconds = 20
 
     $TimesToGo = $MaxAttempts
@@ -59,7 +59,7 @@ function Remove-AllContainers {
     $TimesToGo = $MaxAttempts
     $Containers = Get-Containers
     While ($Containers -and ($TimesToGo -gt 0)) {
-        docker rm -f @Containers
+        docker rm -f $Containers | Out-Null
         $Containers = Get-Containers
         $TimesToGo = $TimesToGo - 1
     }
@@ -115,7 +115,7 @@ function Initialize-ComputeNode {
 }
 
 Try {
-    if (Initialize-ComputeNode) {
+    if ($True.Equals($(Initialize-ComputeNode))) {
         Write-Log "contrail-autostart succeeded"
     } else {
         Write-Log "contrail-autostart failed"
