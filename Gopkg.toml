@@ -11,7 +11,7 @@ ignored = ["github.com/Juniper/contrail-go-api/types"]
 
 [[constraint]]
   name = "github.com/Microsoft/hcsshim"
-  version = "0.6.14"
+  version = "0.8.6"
 
 [[constraint]]
   name = "github.com/docker/docker"
