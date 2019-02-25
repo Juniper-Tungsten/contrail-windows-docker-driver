@@ -67,7 +67,6 @@ func (repo *HNSContrailNetworksRepository) CreateNetwork(dockerNetID string, net
 	configuration := &hcsshim.HNSNetwork{
 		Name:               hnsNetName,
 		Type:               "transparent",
-		NetworkAdapterName: string(repo.physDataplaneNetAdapter),
 		Subnets:            subnets,
 		DNSServerList:      strings.Join(network.Subnet.DNSServerList, ","),
 	}
