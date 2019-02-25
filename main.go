@@ -84,8 +84,16 @@ func loadConfig(cfgFilePath string) (*configuration.Configuration, error) {
 			return nil, err
 		}
 	}
+	var err error
+	cfg.NetworkName, err = configuration.NewNetworkNameConfiguration(cfg.Driver.WSVersion)
+	if err != nil {
+		return nil, err
+	}
 
-	cfg.Driver.VSwitchName = strings.Replace(cfg.Driver.VSwitchName, "<adapter>",
+	cfg.NetworkName.VSwitchName = strings.Replace(cfg.NetworkName.VSwitchName, "<adapter>",
+		cfg.Driver.Adapter, -1)
+
+	cfg.NetworkName.VAdapterName = strings.Replace(cfg.NetworkName.VAdapterName, "<adapter>",
 		cfg.Driver.Adapter, -1)
 
 	log.Debugln("Configuration:", cfg)
@@ -93,10 +101,10 @@ func loadConfig(cfgFilePath string) (*configuration.Configuration, error) {
 }
 
 func run(cfg *configuration.Configuration) error {
-	if err := vmswitch.EnsureSwitchExists(cfg.Driver.VSwitchName, cfg.Driver.Adapter); err != nil {
+	if err := vmswitch.EnsureSwitchExists(cfg.NetworkName.VSwitchName, cfg.NetworkName.VAdapterName, cfg.Driver.Adapter); err != nil {
 		return err
 	}
-	hypervExtension := hyperv_extension.NewHyperVvRouterForwardingExtension(cfg.Driver.VSwitchName)
+	hypervExtension := hyperv_extension.NewHyperVvRouterForwardingExtension(cfg.NetworkName.VSwitchName)
 	vrouter := vrouter.NewHyperVvRouter(hypervExtension)
 
 	controller, err := NewControllerAdapter(cfg)
@@ -111,7 +119,7 @@ func run(cfg *configuration.Configuration) error {
 
 	agent := agent.NewAgentRestAPI(http.DefaultClient, agentUrl)
 
-	netRepo := hns_contrail.NewHNSContrailNetworksRepository(cfg.Driver.Adapter, cfg.Driver.VSwitchName)
+	netRepo := hns_contrail.NewHNSContrailNetworksRepository(cfg.Driver.Adapter, cfg.NetworkName.VSwitchName)
 
 	epRepo := &hns_contrail.HNSEndpointRepository{}
 

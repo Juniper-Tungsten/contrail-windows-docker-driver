@@ -56,7 +56,7 @@ func DoesSwitchExist(name string) (switchState, error) {
 	return PRESENT, nil
 }
 
-func EnsureSwitchExists(vmSwitchName, nameOfAdapterToUse string) error {
+func EnsureSwitchExists(vmSwitchName, vAdapterName, nameOfAdapterToUse string) error {
 	// HNS automatically creates a new vswitch if the first HNS network is created. We want to
 	// control this behaviour. That's why we create a dummy root HNS network.
 
@@ -91,6 +91,10 @@ func EnsureSwitchExists(vmSwitchName, nameOfAdapterToUse string) error {
 		}
 		rootNetID, err := hns.CreateHNSNetwork(configuration)
 		if err != nil {
+			return err
+		}
+
+		if err := win_networking.WaitForValidIPReacquisition(vAdapterName); err != nil {
 			return err
 		}
 

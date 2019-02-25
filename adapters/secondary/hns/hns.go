@@ -20,7 +20,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/win_networking"
 	"github.com/Microsoft/hcsshim"
 	log "github.com/sirupsen/logrus"
 )
@@ -35,9 +34,6 @@ const (
 	// in case of retrying. This should be greater than CreateHNSNetworkInitialRetryDelay
 	// and AdapterReconnectTimeout combined for the retry to be attempted.
 	createHNSNetworkTimeout = 90 * time.Second
-
-	// hnsTransparentInterfaceName is the name of transparent HNS vswitch interface name
-	hnsTransparentInterfaceName = "vEthernet (HNSTransparent)"
 )
 
 type recoverableError struct {
@@ -61,21 +57,6 @@ func tryCreateHNSNetwork(config string) (string, error) {
 		} else {
 			return "", err
 		}
-	}
-
-	// When the first HNS network is created, a vswitch is also created and attached to
-	// specified network adapter. This adapter will temporarily lose network connectivity
-	// while it reacquires IPv4. We need to wait for it.
-	// https://github.com/Microsoft/hcsshim/issues/108
-	if err := win_networking.WaitForValidIPReacquisition(hnsTransparentInterfaceName); err != nil {
-		log.Errorln(err)
-
-		deleteErr := DeleteHNSNetwork(response.Id)
-		if deleteErr != nil {
-			return "", deleteErr
-		}
-
-		return "", &recoverableError{inner: err}
 	}
 
 	return response.Id, nil
