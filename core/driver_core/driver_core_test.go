@@ -49,6 +49,7 @@ const (
 	dockerNetID       = "1234dnID"
 	endpointID        = "5678epID"
 	endpointIP        = "1.2.3.10"
+	WSVersion         = "2016"
 )
 
 func TestCore(t *testing.T) {
@@ -432,7 +433,7 @@ func newSimulatedModulesUnderTest(agentURL *url.URL) (c *driver_core.ContrailDri
 	agent := agent.NewAgentRestAPI(http.DefaultClient, agentURL)
 
 	var err error
-	c, err = driver_core.NewContrailDriverCore(vrouter, controller, agent, netRepo, epRepo)
+	c, err = driver_core.NewContrailDriverCore(vrouter, controller, agent, netRepo, epRepo, WSVersion)
 	Expect(err).ToNot(HaveOccurred())
 
 	return

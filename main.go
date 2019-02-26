@@ -123,7 +123,7 @@ func run(cfg *configuration.Configuration) error {
 
 	epRepo := &hns_contrail.HNSEndpointRepository{}
 
-	core, err := driver_core.NewContrailDriverCore(vrouter, controller, agent, netRepo, epRepo)
+	core, err := driver_core.NewContrailDriverCore(vrouter, controller, agent, netRepo, epRepo, cfg.Driver.WSVersion)
 	if err != nil {
 		return err
 	}
