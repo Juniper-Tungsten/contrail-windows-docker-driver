@@ -16,6 +16,7 @@
 package configuration
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 
@@ -29,7 +30,7 @@ type DriverConf struct {
 	ControllerIP   string
 	ControllerPort int
 	AgentURL       string
-	VSwitchName    string
+	WSVersion      string
 }
 
 type AuthConf struct {
@@ -42,10 +43,16 @@ type LoggingConf struct {
 	LogLevel string
 }
 
+type NetworkNameConf struct {
+	VSwitchName  string
+	VAdapterName string
+}
+
 type Configuration struct {
-	Driver  DriverConf
-	Auth    AuthConf
-	Logging LoggingConf
+	Driver      DriverConf
+	Auth        AuthConf
+	Logging     LoggingConf
+	NetworkName NetworkNameConf
 }
 
 func NewDefaultConfiguration() (conf Configuration) {
@@ -53,7 +60,7 @@ func NewDefaultConfiguration() (conf Configuration) {
 	conf.Driver.ControllerIP = "192.168.0.10"
 	conf.Driver.ControllerPort = 8082
 	conf.Driver.AgentURL = "http://127.0.0.1:9091"
-	conf.Driver.VSwitchName = "Layered?<adapter>"
+	conf.Driver.WSVersion = "2016"
 
 	conf.Logging.LogPath = logging.DefaultLogFilepath()
 	conf.Logging.LogLevel = "Info"
@@ -66,6 +73,21 @@ func NewDefaultConfiguration() (conf Configuration) {
 	conf.Auth.Keystone.Os_password = ""
 	conf.Auth.Keystone.Os_token = ""
 
+	return
+}
+
+func NewNetworkNameConfiguration(wsVersion string) (conf NetworkNameConf, err error) {
+	err = nil
+	switch wsVersion {
+	case "2016":
+		conf.VAdapterName = "vEthernet (HNSTransparent)"
+		conf.VSwitchName = "Layered?<adapter>"
+	case "2019":
+		conf.VAdapterName = "vEthernet (<adapter>)"
+		conf.VSwitchName = "ContrailRootNetwork*"
+	default:
+		err = errors.New("supported versions of Windows Server are: 2016, 2019")
+	}
 	return
 }
 

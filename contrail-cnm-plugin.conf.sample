@@ -11,17 +11,12 @@ ControllerPort = 8082
 # URL of Agent API
 AgentURL = http://127.0.0.1:9091
 
-# Name of Transparent virtual switch.
-# Special wildcard "<adapter>" will be interpretted as value of netAdapter
-# parameter. For example, if netAdapter is "Ethernet0", then vswitchName will
-# be equal to "Layered Ethernet0".
-# You can use Get-VMSwitch PowerShell command to check how the switch is called
-# on your version of OS.
-VSwitchName = Layered?<adapter>
+# Version of Windows Server
+WSVersion = 2016
 
 [LOGGING]
 # Path to log file. Leave empty for default
-LogPath = 
+LogPath =
 
 # Log verbosity (possible values: Debug|Info|Warn|Error|Fatal|Panic)")
 LogLevel = Debug
@@ -44,4 +39,4 @@ Os_tenant_name = admin
 Os_password = hunter2
 
 # Keystone token. If empty, will read environment variable.
-Os_token = 
+Os_token =

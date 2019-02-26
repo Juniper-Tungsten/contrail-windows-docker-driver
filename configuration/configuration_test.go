@@ -111,7 +111,7 @@ var _ = Describe("Configuration", func() {
 				ControllerIP:   "10.0.0.10",
 				ControllerPort: 8082,
 				AgentURL:       "http://127.0.0.1:9091",
-				VSwitchName:    "Layered?<adapter>",
+				WSVersion:      "2016",
 			}))
 			Expect(cfg.Auth.AuthMethod).To(Equal("keystone"))
 			Expect(cfg.Auth.Keystone).To(Equal(auth.KeystoneParams{
