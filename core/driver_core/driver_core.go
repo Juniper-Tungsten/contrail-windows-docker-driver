@@ -30,23 +30,30 @@ import (
 )
 
 type ContrailDriverCore struct {
-	vrouter         ports.VRouter
-	controller      ports.Controller
-	portAssociation ports.PortAssociation
+	vrouter                      ports.VRouter
+	controller                   ports.Controller
+	portAssociation              ports.PortAssociation
+	generateEndpointFriendlyName func(string, string) string
 	// TODO: all these fields below should be made private eventually
 	LocalContrailNetworksRepo  ports.LocalContrailNetworkRepository
 	LocalContrailEndpointsRepo ports.LocalContrailEndpointRepository
 }
 
 func NewContrailDriverCore(vr ports.VRouter, c ports.Controller, a ports.PortAssociation,
-	nr ports.LocalContrailNetworkRepository,
-	er ports.LocalContrailEndpointRepository) (*ContrailDriverCore, error) {
+	nr ports.LocalContrailNetworkRepository, er ports.LocalContrailEndpointRepository,
+	WSVersion string) (*ContrailDriverCore, error) {
 	core := ContrailDriverCore{
 		vrouter:                    vr,
 		controller:                 c,
 		portAssociation:            a,
 		LocalContrailNetworksRepo:  nr,
 		LocalContrailEndpointsRepo: er,
+	}
+	switch WSVersion {
+	case "2016":
+		core.generateEndpointFriendlyName = generateEndpointFriendlyName2016
+	case "2019":
+		core.generateEndpointFriendlyName = generateEndpointFriendlyName2019
 	}
 	if err := core.initializeAdapters(); err != nil {
 		return nil, err
@@ -142,7 +149,7 @@ func (core *ContrailDriverCore) createContainerEndpointInLocalNetwork(container 
 	}
 
 	// TODO: this can be refactored into some nice mechanism.
-	ifName := core.generateFriendlyName(hnsEndpointID)
+	ifName := core.generateEndpointFriendlyName(hnsEndpointID, name)
 
 	ep := &model.LocalEndpoint{
 		IfName: ifName,
@@ -183,18 +190,20 @@ func (core *ContrailDriverCore) disassociatePort(container *model.Container) {
 	}()
 }
 
-func (core *ContrailDriverCore) generateFriendlyName(hnsEndpointID string) string {
-	// Here's how the Forwarding Extension (kernel) can identify interfaces based on their
-	// friendly names.
-	// Windows Containers have NIC names like "NIC ID abcdef", where abcdef are the first 6 chars
-	// of their HNS endpoint ID.
+func generateEndpointFriendlyName2016(hnsEndpointID string, hnsEndpointName string) string {
+	// On Windows Server 2016 Windows Containers have NIC names like "NIC ID abcdef",
+	// where abcdef are the first 6 chars of their HNS endpoint ID.
 	// Hyper-V Containers have NIC names consisting of two uuids, probably representing utitlity
 	// VM's interface and endpoint's interface:
 	// "227301f6-bee9-4ae2-8a93-5e900cde3f47--910c5490-bff8-45e3-a2a0-0114ed9903e0"
 	// The second UUID (after the "--") is the HNS endpoints ID.
-
 	// For now, we will always send the name in the Windows Containers format, because it probably
 	// has enough information to recognize it in kernel (6 first chars of UUID should be enough):
 	containerNicID := strings.Split(hnsEndpointID, "-")[0]
 	return fmt.Sprintf("Container NIC %s", containerNicID)
+}
+
+func generateEndpointFriendlyName2019(hnsEndpointID string, hnsEndpointName string) string {
+	// On Windows Server 2019 Windows Containers have NIC names that are just endpoint name.
+	return hnsEndpointName
 }

@@ -38,6 +38,7 @@ const (
 	NetworkName = "test_net"
 	SubnetCIDR  = "1.2.3.4/24"
 	DefaultGW   = "1.2.3.1"
+	WSVersion   = "2016"
 )
 
 func NewIntegrationModulesUnderTest() (vr ports.VRouter, d *cnm.ServerCNM, c ports.Controller, netRepo ports.LocalContrailNetworkRepository, p *types.Project) {
@@ -59,7 +60,7 @@ func NewIntegrationModulesUnderTest() (vr ports.VRouter, d *cnm.ServerCNM, c por
 	serverUrl, _ := url.Parse("http://127.0.0.1:9091")
 	a := agent.NewAgentRestAPI(http.DefaultClient, serverUrl)
 
-	driverCore, err := driver_core.NewContrailDriverCore(vr, c, a, netRepo, epRepo)
+	driverCore, err := driver_core.NewContrailDriverCore(vr, c, a, netRepo, epRepo, WSVersion)
 	Expect(err).ToNot(HaveOccurred())
 	d = cnm.NewServerCNM(driverCore)
 
