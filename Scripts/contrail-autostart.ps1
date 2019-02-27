@@ -77,11 +77,17 @@ function Remove-AgentPorts {
     Remove-Item -Path $PortsPath -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-function Remove-HnsNetworks {
+function Remove-HnsNetworksByContainersCmd {
     Write-Log "Removing HNS Networks"
 
     Get-ContainerNetwork | Remove-ContainerNetwork -Force -ErrorAction SilentlyContinue
     Get-ContainerNetwork | Remove-ContainerNetwork -Force
+}
+
+function Remove-HnsNetworksByHnsCmd {
+    Write-Log "Removing HNS Networks"
+
+    Get-HnsNetwork | Remove-HnsNetwork
 }
 
 function Remove-CnmPluginSpec {
@@ -115,6 +121,14 @@ function Initialize-ComputeNode {
 }
 
 Try {
+    if (Get-Command -Name Get-ContainerNetwork -ErrorAction SilentlyContinue) {
+        Set-Alias -Name Remove-HnsNetworks -Value Remove-HnsNetworksByContainersCmd
+    } elseif (Get-Command -Name Get-HnsNetwork -ErrorAction SilentlyContinue) {
+        Set-Alias -Name Remove-HnsNetworks -Value Remove-HnsNetworksByHnsCmd
+    } else {
+        throw 'Either Get/Remove-ContainerNetwork or Get/Remove-HnsNetwork cmdlets need to be avaliable.'
+    }
+
     if ($True.Equals($(Initialize-ComputeNode))) {
         Write-Log "contrail-autostart succeeded"
     } else {
@@ -123,4 +137,6 @@ Try {
 } Catch {
     $ErrorMessage = $_.Exception.Message
     Write-Log "contrail-autostart failed with the following error message: $ErrorMessage"
+} Finally {
+    Remove-Item alias:\Remove-HnsNetworks -ErrorAction SilentlyContinue
 }
