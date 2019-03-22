@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Juniper/contrail-windows-docker-driver/configuration"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/hns"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/local_networking/win_networking"
 	"github.com/Juniper/contrail-windows-docker-driver/powershell"
@@ -33,12 +34,6 @@ const (
 	DELETING
 	PRESENT
 	UNKNOWN
-)
-
-const (
-	// rootNetworkName is a name of root HNS network created solely for the purpose of
-	// having a virtual switch
-	rootNetworkName = "ContrailRootNetwork"
 )
 
 func DoesSwitchExist(name string) (switchState, error) {
@@ -60,7 +55,7 @@ func EnsureSwitchExists(vmSwitchName, vAdapterName, nameOfAdapterToUse string) e
 	// HNS automatically creates a new vswitch if the first HNS network is created. We want to
 	// control this behaviour. That's why we create a dummy root HNS network.
 
-	rootNetwork, err := hns.GetHNSNetworkByName(rootNetworkName)
+	rootNetwork, err := hns.GetHNSNetworkByName(configuration.ROOT_NETWORK_NAME)
 	if err != nil {
 		return err
 	}
@@ -72,7 +67,7 @@ func EnsureSwitchExists(vmSwitchName, vAdapterName, nameOfAdapterToUse string) e
 			},
 		}
 		configuration := &hcsshim.HNSNetwork{
-			Name:               rootNetworkName,
+			Name:               configuration.ROOT_NETWORK_NAME,
 			Type:               "transparent",
 			NetworkAdapterName: nameOfAdapterToUse,
 			Subnets:            subnets,

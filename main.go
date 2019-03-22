@@ -22,7 +22,6 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"strings"
 
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/primary/cnm"
 	"github.com/Juniper/contrail-windows-docker-driver/adapters/secondary/controller_rest"
@@ -85,16 +84,14 @@ func loadConfig(cfgFilePath string) (*configuration.Configuration, error) {
 		}
 	}
 	var err error
-	cfg.NetworkName, err = configuration.NewNetworkNameConfiguration(cfg.Driver.WSVersion)
+	cfg.WSVersion, err = configuration.GetWindowsServerVersion()
 	if err != nil {
 		return nil, err
 	}
-
-	cfg.NetworkName.VSwitchName = strings.Replace(cfg.NetworkName.VSwitchName, "<adapter>",
-		cfg.Driver.Adapter, -1)
-
-	cfg.NetworkName.VAdapterName = strings.Replace(cfg.NetworkName.VAdapterName, "<adapter>",
-		cfg.Driver.Adapter, -1)
+	cfg.NetworkName, err = configuration.NewNetworkNameConfiguration(cfg)
+	if err != nil {
+		return nil, err
+	}
 
 	log.Debugln("Configuration:", cfg)
 	return &cfg, nil
@@ -123,7 +120,7 @@ func run(cfg *configuration.Configuration) error {
 
 	epRepo := &hns_contrail.HNSEndpointRepository{}
 
-	core, err := driver_core.NewContrailDriverCore(vrouter, controller, agent, netRepo, epRepo, cfg.Driver.WSVersion)
+	core, err := driver_core.NewContrailDriverCore(vrouter, controller, agent, netRepo, epRepo, cfg.WSVersion)
 	if err != nil {
 		return err
 	}
