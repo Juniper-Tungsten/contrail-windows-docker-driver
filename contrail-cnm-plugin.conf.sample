@@ -11,9 +11,6 @@ ControllerPort = 8082
 # URL of Agent API
 AgentURL = http://127.0.0.1:9091
 
-# Version of Windows Server
-WSVersion = 2016
-
 [LOGGING]
 # Path to log file. Leave empty for default
 LogPath =
