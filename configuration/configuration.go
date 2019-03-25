@@ -39,7 +39,6 @@ type DriverConf struct {
 	ControllerIP   string
 	ControllerPort int
 	AgentURL       string
-	WSVersion      string
 }
 
 type AuthConf struct {
@@ -70,7 +69,6 @@ func NewDefaultConfiguration() (conf Configuration) {
 	conf.Driver.ControllerIP = "192.168.0.10"
 	conf.Driver.ControllerPort = 8082
 	conf.Driver.AgentURL = "http://127.0.0.1:9091"
-	conf.Driver.WSVersion = "2016"
 
 	conf.Logging.LogPath = logging.DefaultLogFilepath()
 	conf.Logging.LogLevel = "Info"
